@@ -201,6 +201,8 @@ body.focus .group{border-bottom:0}
 </div>
 <footer class="bar" id="bar"></footer>
 <script>
+// ?src=ledger shows the harness ledger; default is live Hermes sessions.
+const SRCQ='src='+encodeURIComponent(new URLSearchParams(location.search).get('src')||'sessions');
 let DATA = null;
 let FOCUS = new URLSearchParams(location.search).get('session');
 function chrome(){
@@ -485,10 +487,10 @@ function bar(){
 
 /* ---------- live ---------- */
 const live=document.getElementById('live');
-async function load(){ const f=FOCUS; const d=await (await fetch('api/data'+(f?'?session='+encodeURIComponent(f):''))).json(); if(f!==FOCUS) return; DATA=d; chrome(); render(); }
+async function load(){ const f=FOCUS; const d=await (await fetch('api/data?'+SRCQ+(f?'&session='+encodeURIComponent(f):''))).json(); if(f!==FOCUS) return; DATA=d; chrome(); render(); }
 async function tick(){
   try{
-    const v=(await (await fetch('api/version')).json()).version;
+    const v=(await (await fetch('api/version?'+SRCQ)).json()).version;
     live.className='live'; live.lastElementChild.textContent='live';
     if(!DATA || v!==DATA.version) await load();
   }catch(e){ live.className='live off'; live.lastElementChild.textContent='disconnected'; }

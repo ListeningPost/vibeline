@@ -8,10 +8,28 @@ Three surfaces, same data:
 | Surface | Command | What you get |
 |---|---|---|
 | Hermes TUI | `/rails` | Ink widget inside `hermes --tui` (parent/child rails, inspector, Esc/q closes) |
-| Web | `hermes vibeline web --open` | Live page: every Hermes session on the machine, plus the harness ledger |
+| Web | `hermes vibeline web --open` | Live page: every Hermes session on the machine; `?src=ledger` for the harness ledger |
 | CLI / model | `hermes vibeline rails`, tool `vibeline_rails` | Rich panel in the terminal, markdown for the model |
 
 Runtime dependencies: Python 3.10+ standard library only. `rich` is used if present (Hermes ships it).
+
+## Screenshots
+
+**Web UI, Sessions view.** Every Hermes session on the machine, subagents as child rails branching at spawn,
+tool calls as dots. Clicking a mark opens the inspector on the right.
+
+![Sessions view](docs/web-sessions.png)
+
+**Web UI, Ledger view** (`/?src=ledger`). The harness task ledger: parent lane, five spawned workers, the
+expected TDD RED on `store`, and the acceptance-criteria PASS/DONE on the parent.
+
+![Ledger view](docs/web-ledger.png)
+
+**Classic CLI panel** (`hermes vibeline rails`). The same ledger as a Rich panel in the terminal.
+
+![CLI panel](docs/cli-panel.png)
+
+The web captures use a mock `state.db` and the bundled sample ledger, so what you see on a fresh install matches.
 
 ## Quick start (5 minutes)
 
@@ -83,7 +101,7 @@ plugins:
 hermes vibeline rails [TASK_ID] [--db PATH] [--tokens]   # latest task if TASK_ID omitted
 hermes vibeline dashboard                                 # task x AC table
 hermes vibeline tasks                                     # list task ids
-hermes vibeline web [--port 8877] [--host 127.0.0.1] [--open]
+hermes vibeline web [--port 8877] [--host 127.0.0.1] [--open]   # add ?src=ledger to the URL for the ledger view
 hermes vibeline open SESSION_ID [--dry]                   # new terminal running: hermes --resume SESSION_ID
 hermes vibeline check [--db PATH]
 ```

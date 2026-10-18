@@ -170,6 +170,7 @@ def web_data(db: Path) -> dict[str, Any]:
             "tokens": tin + tout,
             "tasks": len(parents),
             "events": len(rows),
+            "running": sum(1 for p in parents if p.get("status") == "running"),
             "ac": len(acs),
             "ac_met": sum(1 for a in acs if a["met"]),
         },
