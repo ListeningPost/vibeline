@@ -16,7 +16,7 @@ Runtime dependencies: Python 3.10+ standard library only. `rich` is used if pres
 ## Quick start (5 minutes)
 
 ```bash
-git clone <this repo> ~/vibeline        # or unpack the archive anywhere
+git clone git@github.com:ListeningPost/vibeline.git ~/vibeline
 cd ~/vibeline
 ./install.sh                            # links into ~/.hermes/plugins, enables, runs self-check
 ```
@@ -144,3 +144,7 @@ examples/     sample trace.db          sketches/   design mockups, not shipped t
 - **Web UI: "restart vibeline web"**. An older server process is still running on the port. Stop it or use `--port`.
 - **`open` fails with "no terminal emulator found"**. Set `VIBELINE_TERMINAL` to the binary name of your terminal.
 - **Plugin not loading after a Hermes upgrade.** `hermes plugins doctor` and `hermes plugins validate /path/to/vibeline`.
+
+## License
+
+MIT. See [LICENSE](LICENSE). Copyright (c) 2026 ListeningPost.

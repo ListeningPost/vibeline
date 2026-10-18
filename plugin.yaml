@@ -1,7 +1,7 @@
 name: vibeline
 version: 0.1.0
 description: "Render agent-harness rails as markdown in the Hermes CLI session. /rails and hermes vibeline."
-author: local
+author: ListeningPost
 license: MIT
 manifest_version: 2
 api_version: 1
