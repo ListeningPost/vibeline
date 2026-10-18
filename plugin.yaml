@@ -1,0 +1,20 @@
+name: vibeline
+version: 0.1.0
+description: "Render agent-harness rails as markdown in the Hermes CLI session. /rails and hermes vibeline."
+author: local
+license: MIT
+manifest_version: 2
+api_version: 1
+tags: [rails, ledger, cli, markdown]
+provides_tools:
+  - vibeline_rails
+  - vibeline_dashboard
+config_schema:
+  db:
+    type: str
+    default: ""
+    description: "Path to the append-only events sqlite (TRACE_DB). Empty = auto."
+  show_tokens:
+    type: bool
+    default: false
+    description: "Include token counts in markdown (off by default)."

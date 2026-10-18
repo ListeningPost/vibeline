@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><title>Vibeline · grouped sessions</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0e1116; --bg2:#0b0e13; --card:#161b22; --ink:#e6edf3; --mut:#8b949e; --dim:#6e7681;
+  --line:#21262d; --rail:#3b424b; --railhot:#6e7681; --ok:#3fb950; --bad:#f85149; --fix:#d29922; --sp:#a371f7;
+  --namew:328px; --well:56px; --rowh:104px; --subh:80px; --railoff:18px; }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 "IBM Plex Sans",system-ui}
+body{display:flex;flex-direction:column;height:100vh}
+header{display:flex;align-items:baseline;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);flex:0 0 auto}
+h1{margin:0;font-size:15px;font-weight:600}
+.lede{color:var(--mut);font-size:12px;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tabs{display:flex;gap:4px;margin-left:8px;flex:0 0 auto}
+.tabs a{font-size:12px;color:var(--mut);text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid transparent}
+.tabs a.on{color:var(--ink);border-color:var(--line);background:#161b22}
+.wrap{flex:1;min-height:0;display:flex}
+.stage{flex:1;overflow:auto;position:relative}
+.inner{position:relative}
+.sec-hd{position:sticky;top:0;left:0;z-index:8;background:#010409;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:10px;padding:8px 14px;font:11px/1 "IBM Plex Mono",monospace;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dim);cursor:pointer;box-sizing:border-box}
+.sec-hd b{color:var(--ink);letter-spacing:.08em;font-size:12px}
+.sec-hd span{margin-left:auto;letter-spacing:0;text-transform:none;color:var(--mut)}
+.sec.fold .rows{display:none}
+.group{border-bottom:1px solid var(--line)}
+.group.sel{background:#12161c}
+.row{display:flex;align-items:stretch;height:var(--rowh);cursor:pointer}
+.row.sub{height:var(--subh);cursor:default;border-top:1px dashed #1a1f26}
+.name{width:var(--namew);flex:0 0 var(--namew);position:sticky;left:0;z-index:6;
+  display:flex;align-items:stretch;background:var(--bg);border-right:1px solid var(--line)}
+.group.sel .name{background:#12161c}
+.well{flex:0 0 var(--well);width:var(--well);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-right:1px solid var(--line)}
+.well.running{color:var(--ok)} .well.idle{color:var(--fix)} .well.stopped{color:var(--bad)}
+.well svg{display:block}
+.well.running svg.loop{animation:spin .95s linear infinite}
+.well.idle svg.loop{animation:spin 2.8s linear infinite;opacity:.9}
+.well.stopped svg.loop{opacity:.7}
+.well em{font:500 10px/1 "IBM Plex Mono",monospace;font-style:normal;font-variant-numeric:tabular-nums}
+.pip{width:8px;height:8px;border-radius:50%;background:currentColor}
+.well.running .pip{box-shadow:0 0 0 3px color-mix(in srgb, currentColor 22%, transparent)}
+.copy{min-width:0;flex:1;padding:10px 12px;display:flex;flex-direction:column;justify-content:center}
+.row.sub .copy{padding-left:calc(var(--well) + 12px)}
+.kind{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.copy b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.copy .who{color:var(--mut);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.copy .meta{font:10px/1.3 "IBM Plex Mono",monospace;color:var(--dim);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.railwrap{flex:1;position:relative}
+.rail{position:absolute;bottom:var(--railoff);height:3px;border-radius:2px;background:var(--rail);transform:translateY(50%)}
+.rail.sub{height:2px}
+.gap{position:absolute;top:0;bottom:0;background:var(--bg2);border-left:1px solid var(--line);border-right:1px solid var(--line);z-index:1;
+  background-image:repeating-linear-gradient(135deg,transparent 0 6px,#161b22 6px 7px)}
+.tip{position:absolute;bottom:var(--railoff);height:8px;display:flex;align-items:center;gap:5px;transform:translateY(50%);z-index:5;pointer-events:none}
+.tip.running{color:var(--ok)} .tip.idle{color:var(--fix)}
+.tip i{width:5px;height:5px;border-radius:50%;background:currentColor;display:block;animation:live 1.2s ease-in-out infinite}
+.tip i:nth-child(2){animation-delay:.2s} .tip i:nth-child(3){animation-delay:.4s}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes live{0%,100%{opacity:.2} 40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.well svg.loop,.tip i{animation:none}}
+.ev{position:absolute;bottom:var(--railoff);width:0;height:0;z-index:3}
+.mark{position:absolute;left:-5px;top:-5px;width:10px;height:10px;border-radius:50%;background:var(--bg);border:2.5px solid;z-index:4;cursor:pointer}
+.mark.kind-spawn{border-radius:2px;transform:rotate(45deg);width:9px;height:9px;left:-4.5px;top:-4.5px}
+.mark.kind-open,.mark.kind-done{background:currentColor}
+.ev.quiet .mark{width:7px;height:7px;left:-3.5px;top:-3.5px;background:currentColor;border-width:0;opacity:.75}
+.ev.quiet.k-spawn .mark{border-width:2.5px;background:var(--bg);width:9px;height:9px;left:-4.5px;top:-4.5px;opacity:1}
+.ev.on .mark,.ev:hover .mark{box-shadow:0 0 0 3px var(--bg),0 0 0 4.5px currentColor;opacity:1}
+.card{position:absolute;transform:translateX(-50%);z-index:3;padding:3px 7px 4px;border-radius:6px;background:var(--card);
+  border:1px solid var(--line);font:10px/1.15 "IBM Plex Mono",monospace;text-align:center;white-space:nowrap;bottom:11px;cursor:pointer}
+.card b{display:block;font-weight:600;letter-spacing:.04em;font-size:10px;max-width:62px;overflow:hidden;text-overflow:ellipsis;margin:0 auto}
+.card small{display:block;color:var(--mut);font-size:9px;margin-top:2px}
+.card.t2{bottom:44px}
+.k-open,.k-done,.k-pass{color:var(--ok)} .k-fail{color:var(--bad)} .k-spawn{color:var(--sp)} .k-note{color:#58a6ff} .k-red{color:var(--fix)}
+.card.k-open b,.card.k-done b,.card.k-pass b{color:var(--ok)} .card.k-spawn b{color:var(--sp)} .card.k-fail b{color:var(--bad)} .card.k-note b{color:#58a6ff}
+.leader{position:absolute;left:0;bottom:0;width:1px;background:var(--rail);z-index:2}
+.leader.h{height:1px}
+.foot{position:sticky;bottom:0;z-index:7;height:44px;background:#010409;border-top:1px solid var(--line);display:flex}
+.foot-lab{width:var(--namew);flex:0 0 var(--namew);color:var(--dim);font-size:9px;letter-spacing:.1em;position:sticky;left:0;z-index:8;
+  text-transform:uppercase;display:flex;align-items:center;padding:0 12px;border-right:1px solid var(--line);background:#010409}
+.foot-track{flex:1;position:relative}
+.tk{position:absolute;top:0;height:6px;border-left:1px solid #30363d}
+.tk.maj{height:10px;border-color:#484f58}
+.tk span{position:absolute;left:0;top:13px;transform:translateX(-50%);font:10px/1 "IBM Plex Mono",monospace;color:var(--mut);white-space:nowrap}
+.tk.gapmark{border:0;top:0;height:100%;background:var(--bg2) repeating-linear-gradient(135deg,transparent 0 6px,#161b22 6px 7px)}
+.tk.gapmark span{color:var(--mut);top:10px;font-size:9px;text-align:center}
+.tk.gapmark span b{display:block;color:var(--dim);font-weight:500}
+.guide{position:absolute;top:0;width:0;border-left:1px dashed var(--railhot);z-index:5;pointer-events:none;display:none}
+.guide em{position:absolute;bottom:4px;left:4px;transform:translateX(-50%);font:10px/1 "IBM Plex Mono",monospace;color:var(--ink);
+  background:#010409;border:1px solid #30363d;padding:3px 6px;border-radius:4px;font-style:normal;white-space:nowrap}
+.panel{width:360px;flex:0 0 360px;border-left:1px solid var(--line);overflow:auto;padding:18px;background:#0d1117}
+.panel h2{margin:0 0 8px;font-size:18px}
+.panel h3{margin:16px 0 6px;font-size:11px;color:var(--mut);letter-spacing:.08em;text-transform:uppercase}
+.kicker{font:11px "IBM Plex Mono",monospace;margin:0 0 4px;color:var(--mut)}
+.brief{margin:0 0 12px;color:var(--mut);font-size:13px}
+dl{display:grid;grid-template-columns:78px minmax(0,1fr);gap:4px 8px;font-size:12px;margin:0}
+dt{color:var(--mut)} dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:11px;overflow-wrap:anywhere}
+pre{background:#161b22;padding:10px;border-radius:8px;white-space:pre-wrap;font-size:11px;overflow:auto}
+.log{list-style:none;margin:0;padding:0;font-size:11px}
+.log li{display:grid;grid-template-columns:62px 54px minmax(0,1fr);gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer}
+.log li:hover,.log li.on{background:#161b22}
+.log time{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--mut)}
+.log b{font:600 10px "IBM Plex Mono",monospace}
+.log span{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{padding:28px 18px;color:var(--dim);font-size:12px}
+.bar{flex:0 0 40px;display:flex;align-items:center;gap:18px;padding:0 18px;border-top:1px solid var(--line);background:#010409;
+  font:11px "IBM Plex Mono",monospace;color:var(--mut);white-space:nowrap;overflow:hidden}
+.bar b{color:var(--ink)} .bar .db{margin-left:auto;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+.none{padding:16px 18px;color:var(--dim);font-size:12px;border-bottom:1px solid var(--line)}
+</style></head><body>
+<header>
+  <h1>Vibeline</h1>
+  <nav class="tabs">
+    <a href="../001-roster-liveness/index.html">001</a>
+    <a href="../002-rail-pulse/index.html">002</a>
+    <a href="../003-type-groups/index.html" class="on">003</a>
+  </nav>
+  <p class="lede" id="lede">Live snapshot. Loop / repeat / cloud. Loop mark in the well; typical rails end in dots.</p>
+</header>
+<div class="wrap">
+  <div class="stage" id="stage"><div class="inner" id="inner"></div></div>
+  <aside class="panel" id="panel"><p class="dim">Click a marker.</p></aside>
+</div>
+<footer class="bar" id="bar"></footer>
+<script src="data.js"></script>
+<script>
+const LOOP = `<svg class="loop" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`;
+const NAMEW=328, PAD=60, GAPW=76, CARDW=76, CARDGAP=6;
+const ORDER=['loop','repeat','cloud'];
+const looping = s => s.type==='loop' || s.type==='repeat';
+const ms = t => new Date(t).getTime();
+const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = d => new Date(d).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit'});
+const fmtM = d => new Date(d).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+const idle = msv => { const m=Math.round(msv/60000); return m<90?`${m}m`:m<2880?`${Math.round(m/60)}h`:`${Math.round(m/1440)}d`; };
+const num = n => (n||0).toLocaleString();
+const tok = n => n?num(n)+' tok':'— tok';
+const isQuiet = e => e.child || e.quiet;
+const lanesOf = p => [{...p, events:p.events||[]}, ...(p.subs||[])];
+const folded = new Set(ORDER.filter(t => t==='cloud'));
+let sel = (DATA.parents[0]||{}).id;
+let PX, T0, segs, gaps, WIDTH, guide;
+
+function scale(){
+  const all=[]; DATA.parents.forEach(p=>lanesOf(p).forEach(l=>(l.events||[]).forEach(e=>all.push(ms(e.t)))));
+  if(!all.length){ segs=[]; gaps=[]; WIDTH=400; return; }
+  const ts=[...new Set(all)].sort((a,b)=>a-b);
+  const FOLD=12*60000;
+  T0=ts[0]; segs=[]; let cur={a:T0,b:T0};
+  for(const t of ts){ if(t-cur.b>FOLD){ segs.push(cur); cur={a:t,b:t}; } else cur.b=t; }
+  segs.push(cur);
+  const active=segs.reduce((n,s)=>n+(s.b-s.a),0)/60000;
+  PX=Math.max(18,Math.min(900/Math.max(active,1),70));
+  let x=PAD; gaps=[];
+  segs.forEach((s,i)=>{ s.x=x; x+=((s.b-s.a)/60000)*PX; if(i<segs.length-1){ gaps.push({x,w:GAPW,a:s.b,b:segs[i+1].a}); x+=GAPW; } });
+  WIDTH=x+120;
+}
+function toX(t){ t=ms(t);
+  if(!segs.length) return PAD;
+  for(let i=0;i<segs.length;i++){ const s=segs[i];
+    if(t<=s.b) return s.x+Math.max(0,(t-s.a)/60000)*PX;
+    if(i<segs.length-1 && t<segs[i+1].a) return gaps[i].x+GAPW/2; }
+  const s=segs[segs.length-1]; return s.x+((t-s.a)/60000)*PX;
+}
+function layoutCards(events){
+  const sorted=[...events].sort((a,b)=>ms(a.t)-ms(b.t));
+  const lastX={t1:-1e9,t2:-1e9};
+  return sorted.map(e=>{
+    const x=toX(e.t);
+    if(isQuiet(e)) return {e,x,cx:x,tier:'t1'};
+    let tier='t1', cx=x;
+    if(x>=lastX.t1+CARDW+CARDGAP) tier='t1';
+    else if(x>=lastX.t2+CARDW+CARDGAP) tier='t2';
+    else { const s1=lastX.t1+CARDW+CARDGAP-x, s2=lastX.t2+CARDW+CARDGAP-x; tier=s1<=s2?'t1':'t2'; cx=x+Math.min(s1,s2); }
+    lastX[tier]=cx; return {e,x,cx,tier};
+  });
+}
+function evHTML(e,x,cx,tier){
+  if(isQuiet(e)) return `<div class="ev k-${e.kind} quiet" data-id="${esc(e.id)}" style="left:${x}px" title="${esc(e.title)}"><span class="mark kind-${e.kind}"></span></div>`;
+  const h = tier==='t1'?11:44;
+  const dx=cx-x;
+  const leader = Math.abs(dx)>1
+    ? `<div class="leader" style="left:0;bottom:0;height:${h-4}px"></div><div class="leader h" style="left:${Math.min(0,dx)}px;width:${Math.abs(dx)}px;bottom:${h-4}px"></div>`
+    : `<div class="leader" style="left:0;bottom:0;height:${h}px"></div>`;
+  return `<div class="ev k-${e.kind}" data-id="${esc(e.id)}" style="left:${x}px">${leader}
+    <span class="mark kind-${e.kind}"></span>
+    <div class="card ${tier} k-${e.kind}" style="left:${dx}px"><b>${esc(e.label)}${e.n>1?' ×'+e.n:''}</b><small>${fmt(e.t)}</small></div></div>`;
+}
+function tipHTML(s){
+  if(s.status==='stopped' || looping(s) || !(s.events||[]).length) return '';
+  return `<div class="tip ${s.status}" style="left:${toX(s.events.at(-1).t)+18}px"><i></i><i></i><i></i></div>`;
+}
+function wellHTML(s, sub){
+  if(sub) return '';
+  const st=s.status, dur=s.cycle || (st==='stopped'?'—':s.elapsed);
+  if(looping(s)) return `<div class="well ${st}">${LOOP}<em>${esc(dur)}</em></div>`;
+  return `<div class="well ${st}"><span class="pip"></span><em>${esc(s.elapsed||'—')}</em></div>`;
+}
+function railHTML(s, isSub){
+  const ev=s.events||[];
+  if(!ev.length) return `<div class="railwrap" style="width:${WIDTH}px"></div>`;
+  const a=toX(ev[0].t), b=toX(ev.at(-1).t);
+  const gapsHtml=gaps.map(g=>`<div class="gap" style="left:${g.x}px;width:${g.w}px"></div>`).join('');
+  return `<div class="railwrap" style="width:${WIDTH}px">${gapsHtml}
+    <div class="rail${isSub?' sub':''}" style="left:${a}px;width:${Math.max(b-a,6)}px"></div>
+    ${layoutCards(ev).map(o=>evHTML(o.e,o.x,o.cx,o.tier)).join('')}${tipHTML(s)}</div>`;
+}
+function rowHTML(s, sub){
+  const who = sub ? `subagent · ${s.status}` : s.agent;
+  const meta = s.next ? `${s.elapsed} · ${s.next}` : `${s.elapsed} · ${tok(s.tokens)}`;
+  return `<div class="name">${wellHTML(s,sub)}<div class="copy">
+    <div class="kind">${sub?'child':s.type}</div>
+    <b title="${esc(s.name)}">${esc(s.name)}</b>
+    <span class="who">${esc(who)}</span>
+    <span class="meta">${esc(meta)}</span>
+  </div></div>${railHTML(s, !!sub)}`;
+}
+function find(id){
+  for(const p of DATA.parents) for(const l of lanesOf(p)){
+    const i=(l.events||[]).findIndex(e=>e.id===id); if(i>=0) return {p,l,i,e:l.events[i]};
+  }
+  return null;
+}
+function paint(hit){
+  if(!hit){ document.getElementById('panel').innerHTML='<p class="empty">Click a marker.</p>'; return; }
+  const {p,l,i,e:d}=hit, lane=l.events||[];
+  const log=lane.slice(-40).map(e=>`<li class="${e.id===d.id?'on':''}" onclick="select('${esc(e.id)}')"><time>${fmt(e.t).replace(/ [AP]M$/,'')}</time><b class="k-${e.kind}">${esc(e.label)}</b><span>${esc(e.brief)}</span></li>`).join('');
+  document.getElementById('panel').innerHTML=`
+    <p class="kicker k-${d.kind}"><b>${esc(d.label)}</b> · ${fmt(d.t)}</p>
+    <h2>${esc(d.title)}</h2>
+    <p class="brief">${esc(d.brief)}</p>
+    <dl>
+      <dt>session</dt><dd>${esc(p.id)}</dd>
+      <dt>type</dt><dd>${esc(p.type)}</dd>
+      <dt>agent</dt><dd>${esc(d.actor||p.agent)}</dd>
+      <dt>kind</dt><dd>${esc(d.raw_kind||d.kind)}</dd>
+    </dl>
+    <h3>Lane · ${esc(l.name)}</h3>
+    <ul class="log">${log}</ul>`;
+}
+window.select=function(id){
+  const hit=find(String(id)); if(!hit) return false;
+  document.querySelectorAll('.ev').forEach(t=>t.classList.remove('on'));
+  const el=document.querySelector(`.ev[data-id="${CSS.escape(hit.e.id)}"]`); if(el) el.classList.add('on');
+  paint(hit); showGuide(toX(hit.e.t), fmt(hit.e.t)); return true;
+};
+function showGuide(x,label){ if(!guide) return; guide.style.display='block'; guide.style.left=(x+NAMEW)+'px'; guide.style.height=(inner.offsetHeight-44)+'px'; guide.querySelector('em').textContent=label; }
+
+const inner=document.getElementById('inner');
+function render(){
+  scale();
+  const stage=document.getElementById('stage');
+  inner.style.minWidth=(WIDTH+NAMEW)+'px';
+  inner.innerHTML = ORDER.map(type=>{
+    const rows=DATA.parents.filter(p=>p.type===type);
+    const nRun=rows.filter(s=>s.status==='running').length;
+    const nIdle=rows.filter(s=>s.status==='idle').length;
+    const nStop=rows.filter(s=>s.status==='stopped').length;
+    const body = rows.length
+      ? rows.map(s=>`<div class="group${s.id===sel?' sel':''}" data-id="${esc(s.id)}">
+          <div class="row">${rowHTML(s)}</div>
+          ${(s.subs||[]).map(c=>`<div class="row sub">${rowHTML(c,true)}</div>`).join('')}
+        </div>`).join('')
+      : `<div class="none">None on this machine.</div>`;
+    return `<section class="sec${folded.has(type)?' fold':''}" data-type="${type}">
+      <div class="sec-hd" style="width:${stage.clientWidth}px"><b>${type}</b> ${rows.length}
+        <span>${nRun} running · ${nIdle} idle · ${nStop} stopped</span></div>
+      <div class="rows">${body}</div></section>`;
+  }).join('');
+
+  inner.querySelectorAll('.sec-hd').forEach(h=>h.addEventListener('click',e=>{
+    e.stopPropagation(); const t=h.parentElement.dataset.type;
+    folded.has(t)?folded.delete(t):folded.add(t); render();
+  }));
+  inner.querySelectorAll('.group').forEach(g=>g.addEventListener('click',()=>{ sel=g.dataset.id; render(); }));
+  inner.querySelectorAll('.ev').forEach(el=>{
+    const hit=find(el.dataset.id); if(!hit) return;
+    el.addEventListener('click',ev=>{ ev.stopPropagation(); select(el.dataset.id); });
+    el.addEventListener('mouseenter',()=>showGuide(toX(hit.e.t),fmt(hit.e.t)));
+  });
+
+  const foot=document.createElement('div'); foot.className='foot';
+  foot.innerHTML='<div class="foot-lab">clock</div>';
+  const track=document.createElement('div'); track.className='foot-track'; track.style.width=WIDTH+'px';
+  foot.appendChild(track); inner.appendChild(foot);
+  segs.forEach(s=>{
+    const first=new Date(s.a); first.setSeconds(0,0);
+    for(let t=first.getTime(); t<=s.b+60000; t+=60000){
+      if(t<s.a-60000) continue;
+      const d=new Date(t), maj=d.getMinutes()%5===0;
+      const el=document.createElement('div'); el.className='tk'+(maj?' maj':''); el.style.left=toX(t)+'px';
+      const nearGap=gaps.some(g=>Math.abs(toX(t)-g.x)<34||Math.abs(toX(t)-(g.x+g.w))<34);
+      if(maj&&!nearGap) el.innerHTML=`<span>${fmtM(d)}</span>`;
+      track.appendChild(el);
+    }
+  });
+  gaps.forEach(g=>{ const el=document.createElement('div'); el.className='tk gapmark'; el.style.left=g.x+'px'; el.style.width=g.w+'px';
+    el.innerHTML=`<span style="left:50%"><b>${idle(g.b-g.a)} idle</b> ${fmtM(g.a)} → ${fmtM(g.b)}</span>`; track.appendChild(el); });
+  guide=document.createElement('div'); guide.className='guide'; guide.innerHTML='<em></em>'; inner.appendChild(guide);
+
+  const t=DATA.totals||{};
+  document.getElementById('bar').innerHTML=`
+    <span>tokens <b>${t.tokens?num(t.tokens):'—'}</b></span>
+    <span>sessions <b>${DATA.parents.length}</b></span>
+    <span>events <b>${num(t.events||0)}</b></span>
+    <span class="db">${esc(DATA.db||'')}</span>`;
+  document.getElementById('lede').textContent =
+    `Snapshot ${new Date(DATA.captured).toLocaleString()} · ${DATA.parents.filter(p=>p.type==='loop').length} loop · ${DATA.parents.filter(p=>p.type==='repeat').length} repeat · ${DATA.parents.filter(p=>p.type==='cloud').length} cloud`;
+
+  const want = document.querySelector('.group.sel .ev:last-of-type');
+  if(!(location.hash && select(location.hash.slice(1)))){
+    let last=null; DATA.parents.forEach(p=>lanesOf(p).forEach(l=>{(l.events||[]).forEach(e=>{ if(!last||ms(e.t)>ms(last.t)) last=e; });}));
+    if(last){
+      select(last.id);
+      stage.scrollLeft=Math.max(0,toX(last.t)+NAMEW-stage.clientWidth+180);
+    }
+  }
+}
+render();
+</script>
+</body></html>

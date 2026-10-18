@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><title>Vibeline · sessions</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0e1116; --card:#161b22; --ink:#e6edf3; --mut:#8b949e; --dim:#6e7681;
+  --line:#21262d; --rail:#3b424b; --ok:#3fb950; --bad:#f85149; --fix:#d29922; --sp:#a371f7;
+  --namew:328px; --well:56px; --rowh:104px; --subh:80px; --railoff:18px; }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 "IBM Plex Sans",system-ui}
+body{display:flex;flex-direction:column;height:100vh}
+header{display:flex;align-items:baseline;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);flex:0 0 auto}
+h1{margin:0;font-size:15px;font-weight:600}
+.lede{color:var(--mut);font-size:12px;margin:0}
+.tabs{display:flex;gap:4px;margin-left:8px}
+.tabs a{font-size:12px;color:var(--mut);text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid transparent}
+.tabs a.on{color:var(--ink);border-color:var(--line);background:#161b22}
+.wrap{flex:1;min-height:0;display:flex}
+.stage{flex:1;overflow:auto;position:relative}
+.inner{position:relative;min-width:1120px}
+.group{border-bottom:1px solid var(--line)}
+.group.sel{background:#12161c}
+.row{display:flex;align-items:stretch;height:var(--rowh);cursor:pointer}
+.row.sub{height:var(--subh);cursor:default;border-top:1px dashed #1a1f26}
+.name{width:var(--namew);flex:0 0 var(--namew);position:sticky;left:0;z-index:6;
+  display:flex;align-items:stretch;background:var(--bg);border-right:1px solid var(--line)}
+.group.sel .name{background:#12161c}
+.well{flex:0 0 var(--well);width:var(--well);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  border-right:1px solid var(--line)}
+.well.running{color:var(--ok)} .well.idle{color:var(--fix)} .well.stopped{color:var(--bad)}
+.well svg{display:block}
+.well.running svg.loop{animation:spin .95s linear infinite}
+.well.idle svg.loop{animation:spin 2.8s linear infinite;opacity:.9}
+.well.stopped svg.loop{opacity:.7}
+.well em{font:500 10px/1 "IBM Plex Mono",monospace;font-style:normal;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.pip{width:8px;height:8px;border-radius:50%;background:currentColor}
+.well.running .pip{box-shadow:0 0 0 3px color-mix(in srgb, currentColor 22%, transparent)}
+.copy{min-width:0;flex:1;padding:10px 12px;display:flex;flex-direction:column;justify-content:center}
+.row.sub .copy{padding-left:calc(var(--well) + 12px)}
+.kind{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.copy b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.copy .who{color:var(--mut);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.copy .meta{font:10px/1.3 "IBM Plex Mono",monospace;color:var(--dim);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.railwrap{flex:1;position:relative}
+.rail{position:absolute;bottom:var(--railoff);height:3px;border-radius:2px;background:var(--rail);transform:translateY(50%)}
+.rail.sub{height:2px}
+.tip{position:absolute;bottom:var(--railoff);height:8px;display:flex;align-items:center;gap:5px;
+  transform:translateY(50%);z-index:5;pointer-events:none}
+.tip.running{color:var(--ok)} .tip.idle{color:var(--fix)}
+.tip i{width:5px;height:5px;border-radius:50%;background:currentColor;display:block;animation:live 1.2s ease-in-out infinite}
+.tip i:nth-child(2){animation-delay:.2s} .tip i:nth-child(3){animation-delay:.4s}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes live{0%,100%{opacity:.2} 40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.well svg.loop,.tip i{animation:none}}
+.ev{position:absolute;bottom:var(--railoff);width:0;height:0;z-index:3}
+.mark{position:absolute;left:-5px;top:-5px;width:10px;height:10px;border-radius:50%;background:var(--bg);border:2.5px solid;z-index:4}
+.mark.kind-spawn{border-radius:2px;transform:rotate(45deg);width:9px;height:9px;left:-4.5px;top:-4.5px}
+.mark.kind-open,.mark.kind-done{background:currentColor}
+.card{position:absolute;transform:translateX(-50%);z-index:3;padding:3px 7px 4px;border-radius:6px;background:var(--card);
+  border:1px solid var(--line);font:10px/1.15 "IBM Plex Mono",monospace;text-align:center;white-space:nowrap;bottom:11px}
+.card b{display:block;font-weight:600;letter-spacing:.04em;font-size:10px}
+.card small{display:block;color:var(--mut);font-size:9px;margin-top:2px}
+.k-open,.k-done,.k-pass{color:var(--ok)} .k-fail{color:var(--bad)} .k-spawn{color:var(--sp)} .k-note{color:#58a6ff}
+.card.k-open b,.card.k-done b,.card.k-pass b{color:var(--ok)} .card.k-spawn b{color:var(--sp)}
+.leader{position:absolute;left:0;bottom:0;height:11px;width:1px;background:var(--rail);z-index:2}
+.panel{width:360px;flex:0 0 360px;border-left:1px solid var(--line);overflow:auto;padding:18px;background:#0d1117}
+.panel h2{margin:0 0 8px;font-size:18px}
+.kicker{font:11px "IBM Plex Mono",monospace;margin:0 0 4px;color:var(--mut)}
+.kicker b{font-weight:600}
+.brief{margin:0 0 12px;color:var(--mut);font-size:13px}
+dl{display:grid;grid-template-columns:78px 1fr;gap:4px 8px;font-size:12px;margin:0}
+dt{color:var(--mut)} dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:11px}
+.rule{font:12px/1.45 "IBM Plex Sans",system-ui;color:var(--mut);margin:14px 0 0}
+.rule b{color:var(--ink);font-weight:600}
+.bar{flex:0 0 40px;display:flex;align-items:center;gap:14px;padding:0 18px;border-top:1px solid var(--line);background:#010409;
+  font:11px "IBM Plex Mono",monospace;color:var(--mut)}
+.bar b{color:var(--ink)}
+.force{margin-left:auto;display:flex;gap:6px}
+.force button{font:11px "IBM Plex Mono",monospace;background:#161b22;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;cursor:pointer}
+.force button.on{border-color:var(--ink)}
+</style></head><body>
+<header>
+  <h1>Vibeline</h1>
+  <nav class="tabs">
+    <a href="../001-roster-liveness/index.html">001</a>
+    <a href="../002-rail-pulse/index.html" class="on">002</a>
+    <a href="../003-type-groups/index.html">003</a>
+  </nav>
+  <p class="lede">Loop mark in the job well. Live sessions end in dots. Stopped is an END card.</p>
+</header>
+<div class="wrap">
+  <div class="stage"><div class="inner" id="inner"></div></div>
+  <aside class="panel" id="panel"></aside>
+</div>
+<footer class="bar">
+  <span>selected <b id="selname">—</b></span>
+  <div class="force">
+    <button data-st="idle">idle</button>
+    <button data-st="running">running</button>
+    <button data-st="stopped">stopped</button>
+  </div>
+</footer>
+<script>
+/* Circular arrow: a loop, not a spinner. Track + arc + head, rotated as a unit. */
+const LOOP = `<svg class="loop" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <polyline points="23 4 23 10 17 10"/>
+  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+</svg>`;
+const looping = s => s.type==='loop' || s.type==='repeat';
+function wellHTML(s, sub){
+  if(sub) return '';
+  const st = s.status;
+  const short = (s.elapsed||'').replace(/^idle /,'').split(' ')[0];
+  if(looping(s)){
+    const dur = s.cycle || (st==='stopped' ? '—' : short);
+    return `<div class="well ${st}">${LOOP}<em>${dur}</em></div>`;
+  }
+  const dur = st==='stopped' ? '—' : short;
+  return `<div class="well ${st}"><span class="pip"></span><em>${dur}</em></div>`;
+}
+function tipHTML(s){
+  if(s.status==='stopped' || looping(s)) return '';
+  const x = s.events.at(-1).x + 18;
+  return `<div class="tip ${s.status}" style="left:${x}px"><i></i><i></i><i></i></div>`;
+}
+const S = [
+  {id:'loop-1', type:'loop', name:'Vibeline rails', agent:'cli · grok-4.6', status:'running', elapsed:'4m 12s', cycle:'4m',
+    clock:'9:14:02 PM → now', span:'4m 12s', reason:null,
+    events:[{k:'open',l:'PROMPT',t:'9:14:02 PM',x:70},{k:'spawn',l:'SPAWN',t:'9:15:40 PM',x:210},{k:'note',l:'READ',t:'9:16:18 PM',x:310},{k:'pass',l:'REPLY',t:'9:17:50 PM',x:430}],
+    child:{name:'inspect sessions.py', status:'running', elapsed:'2m 01s', type:'child',
+      events:[{k:'spawn',l:'SPAWNED',t:'9:15:40 PM',x:210},{k:'note',l:'SEARCH',t:'9:16:44 PM',x:340}]}},
+  {id:'cron-1', type:'repeat', name:'nightly ledger check', agent:'cron · every 3h', status:'idle', elapsed:'idle 38m', cycle:'3h',
+    clock:'7:00:00 PM → 7:04:11 PM', span:'4m 11s', next:'next 1h 22m', reason:null,
+    events:[{k:'open',l:'TICK',t:'7:00:00 PM',x:70},{k:'note',l:'DASH',t:'7:01:20 PM',x:200},{k:'done',l:'END',t:'7:04:11 PM',x:420}]},
+  {id:'cron-2', type:'repeat', name:'price watch', agent:'cron · every 30m', status:'stopped', elapsed:'stopped', cycle:'30m',
+    clock:'6:12:00 PM → 6:12:44 PM', span:'44s', reason:'paused',
+    events:[{k:'open',l:'TICK',t:'6:12:00 PM',x:70},{k:'done',l:'END',t:'6:12:44 PM',x:260}]},
+  {id:'cloud-1', type:'cloud', name:'modal build', agent:'modal · grok-4.6', status:'running', elapsed:'11m 04s',
+    clock:'9:07:10 PM → now', span:'11m 04s', reason:null,
+    events:[{k:'open',l:'PROMPT',t:'9:07:10 PM',x:70},{k:'note',l:'TERM',t:'9:09:02 PM',x:220},{k:'note',l:'TERM',t:'9:14:40 PM',x:480}]},
+  {id:'loop-2', type:'loop', name:'docs pass', agent:'tui · grok-4.6', status:'idle', elapsed:'idle 22m', cycle:'11m',
+    clock:'8:41:00 PM → 8:52:18 PM', span:'11m 18s', reason:null,
+    events:[{k:'open',l:'PROMPT',t:'8:41:00 PM',x:70},{k:'pass',l:'REPLY',t:'8:52:18 PM',x:500}]}
+];
+let sel = S[0].id;
+function evHTML(e){
+  if(e.k==='note') return `<div class="ev k-note" style="left:${e.x}px"><span class="mark kind-note"></span></div>`;
+  return `<div class="ev k-${e.k}" style="left:${e.x}px">
+    <div class="leader"></div><span class="mark kind-${e.k}"></span>
+    <div class="card k-${e.k}"><b>${e.l}</b><small>${e.t}</small></div></div>`;
+}
+function rail(s, isSub){
+  const last=s.events.at(-1), a=s.events[0].x, b=last.x;
+  return `<div class="railwrap" style="width:760px">
+    <div class="rail${isSub?' sub':''}" style="left:${a}px;width:${Math.max(b-a,6)}px"></div>
+    ${s.events.map(evHTML).join('')}${tipHTML(s)}</div>`;
+}
+function row(s, sub){
+  const who = sub ? `subagent · ${s.status}` : `${s.agent}`;
+  const meta = sub ? s.elapsed : (s.next ? `${s.clock} · ${s.next}` : `${s.clock} · ${s.span}`);
+  return `<div class="name">${wellHTML(s, sub)}<div class="copy">
+    <div class="kind">${sub?'child':s.type}</div>
+    <b>${s.name}</b>
+    <span class="who">${who}</span>
+    <span class="meta">${meta}</span>
+  </div></div>${rail(s, !!sub)}`;
+}
+function paint(){
+  const inner=document.getElementById('inner');
+  inner.innerHTML = S.map(s=>`<div class="group${s.id===sel?' sel':''}" data-id="${s.id}">
+    <div class="row">${row(s)}</div>
+    ${s.child?`<div class="row sub">${row(s.child,true)}</div>`:''}
+  </div>`).join('');
+  inner.querySelectorAll('.group').forEach(g=>g.addEventListener('click',()=>{ sel=g.dataset.id; paint(); }));
+  const s=S.find(x=>x.id===sel);
+  document.getElementById('selname').textContent=s.name;
+  document.querySelectorAll('.force button').forEach(b=>b.classList.toggle('on', b.dataset.st===s.status));
+  const isLoop=looping(s);
+  document.getElementById('panel').innerHTML=`
+    <p class="kicker"><b>${s.type.toUpperCase()}</b> · ${s.agent}</p>
+    <h2>${s.name}</h2>
+    <p class="brief">${s.status==='stopped'?'Stopped. The well is red and still. The rail shows END.':s.status==='running'?'In a turn.':'Alive, waiting.'}</p>
+    <dl>
+      <dt>well</dt><dd>${isLoop?(s.status==='running'?'loop · '+s.cycle:s.status==='idle'?'loop · '+s.cycle:'loop · paused'): (s.status==='running'?s.elapsed:s.status==='idle'?'idle':'stopped')}</dd>
+      <dt>rail</dt><dd>${s.status==='stopped'?'END · '+(s.reason||'closed'):isLoop?'markers only':'live dots'}</dd>
+      ${s.next?`<dt>next</dt><dd>${s.next}</dd>`:''}
+    </dl>
+    <p class="rule">${isLoop?'The circular arrow is the loop. Duration under it is one cycle. It never sits on the graph.':'Typical session: a pip in the well, animated dots after the last marker.'}</p>`;
+}
+document.querySelectorAll('.force button').forEach(b=>b.addEventListener('click',e=>{
+  e.stopPropagation();
+  const s=S.find(x=>x.id===sel); s.status=b.dataset.st;
+  if(s.status==='running'){ s.elapsed='1m 04s'; s.reason=null; s.clock=s.clock.replace(/→.+/,'→ now'); if(s.type==='loop') s.cycle='1m'; }
+  if(s.status==='idle'){ s.elapsed='idle 3m'; s.reason=null; }
+  if(s.status==='stopped'){ s.elapsed='stopped'; s.reason=s.reason||'paused';
+    if(!s.events.some(ev=>ev.k==='done')) s.events=[...s.events,{k:'done',l:'END',t:'now',x:s.events.at(-1).x+90}]; }
+  paint();
+}));
+paint();
+</script>
+</body></html>

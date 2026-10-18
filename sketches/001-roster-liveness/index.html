@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><title>Vibeline mock · roster liveness</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0e1116; --bg2:#0b0e13; --card:#161b22; --ink:#e6edf3; --mut:#8b949e; --dim:#6e7681;
+  --line:#21262d; --rail:#3b424b; --ok:#3fb950; --bad:#f85149; --fix:#d29922; --sp:#a371f7;
+  --namew:300px; --rowh:104px; --subh:80px; --railoff:18px; }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.4 "IBM Plex Sans",system-ui}
+body{display:flex;flex-direction:column;height:100vh}
+header{display:flex;align-items:baseline;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);flex:0 0 auto}
+h1{margin:0;font-size:15px;font-weight:600}
+.lede{color:var(--mut);font-size:12px;margin:0}
+.tabs{display:flex;gap:4px;margin-left:8px}
+.tabs a{font-size:12px;color:var(--mut);text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid transparent}
+.tabs a.on{color:var(--ink);border-color:var(--line);background:#161b22}
+.wrap{flex:1;min-height:0;display:flex}
+.stage{flex:1;overflow:auto}
+.inner{position:relative;min-width:1100px}
+.group{border-bottom:1px solid var(--line)}
+.group.sel{background:#12161c}
+.row{display:flex;align-items:stretch;height:var(--rowh);cursor:pointer}
+.row.sub{height:var(--subh);cursor:default}
+.name{width:var(--namew);flex:0 0 var(--namew);padding:6px 12px;position:sticky;left:0;background:var(--bg);z-index:6;
+  display:flex;align-items:center;gap:8px;border-right:1px solid var(--line)}
+.group.sel .name{background:#12161c}
+.row.sub .name{padding-left:30px}
+.name b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.name span{color:var(--mut);font-size:11px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.name .meta{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--dim);margin-top:2px}
+.parent-lab{font-size:9px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.hb{display:inline-flex;align-items:center;gap:5px;font:10px/1 "IBM Plex Mono",monospace}
+.hb.running{color:var(--ok)} .hb.idle{color:var(--fix)} .hb.stopped{color:var(--bad)}
+.hb.running svg polyline{stroke-dasharray:10 38;animation:ecg .85s linear infinite}
+.hb.idle svg polyline{stroke-dasharray:6 42;animation:ecg 2.4s linear infinite}
+.hb.stopped svg polyline{opacity:.75}
+.hb em{font-style:normal;font-weight:500}
+@keyframes ecg{to{stroke-dashoffset:-48}}
+@media (prefers-reduced-motion:reduce){.hb svg polyline{animation:none;stroke-dasharray:none}}
+.railwrap{flex:1;position:relative}
+.rail{position:absolute;bottom:var(--railoff);height:3px;border-radius:2px;background:var(--rail);transform:translateY(50%)}
+.rail.live::after{content:"";position:absolute;left:100%;top:0;height:3px;width:60px;
+  background:repeating-linear-gradient(90deg,var(--rail) 0 6px,transparent 6px 12px);
+  -webkit-mask:linear-gradient(90deg,#000,transparent);mask:linear-gradient(90deg,#000,transparent)}
+.rail.sub{height:2px}
+.ev{position:absolute;bottom:var(--railoff);width:0;height:0;z-index:3}
+.dot{position:absolute;left:-5px;top:-5px;width:10px;height:10px;border-radius:50%;background:var(--bg);border:2.5px solid}
+.dot.kind-spawn{border-radius:2px;transform:rotate(45deg);width:9px;height:9px;left:-4.5px;top:-4.5px}
+.dot.kind-open,.dot.kind-done{background:currentColor}
+.card{position:absolute;transform:translateX(-50%);z-index:3;padding:3px 7px 4px;border-radius:6px;background:var(--card);
+  border:1px solid var(--line);font:10px/1.15 "IBM Plex Mono",monospace;text-align:center;white-space:nowrap;bottom:11px}
+.card b{display:block;font-weight:600;letter-spacing:.04em;font-size:10px}
+.card small{display:block;color:var(--mut);font-size:9px;margin-top:2px}
+.k-open,.k-done,.k-pass{color:var(--ok)} .k-fail{color:var(--bad)} .k-spawn{color:var(--sp)} .k-note{color:#58a6ff}
+.card.k-open b,.card.k-done b,.card.k-pass b{color:var(--ok)} .card.k-spawn b{color:var(--sp)}
+.leader{position:absolute;left:0;bottom:0;height:11px;width:1px;background:var(--rail)}
+.panel{width:360px;flex:0 0 360px;border-left:1px solid var(--line);overflow:auto;padding:18px;background:#0d1117}
+.panel h2{margin:0 0 8px;font-size:18px}
+.panel h3{margin:16px 0 6px;font-size:11px;color:var(--mut);letter-spacing:.08em;text-transform:uppercase}
+.kicker{font:11px "IBM Plex Mono",monospace;margin:0 0 4px;color:var(--mut)}
+.brief{margin:0 0 12px;color:var(--mut);font-size:13px}
+dl{display:grid;grid-template-columns:78px 1fr;gap:4px 8px;font-size:12px;margin:0}
+dt{color:var(--mut)} dd{margin:0;font-family:"IBM Plex Mono",monospace;font-size:11px}
+.rule{font:11px/1.45 "IBM Plex Sans",system-ui;color:var(--mut);background:#161b22;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:12px 0 0}
+.rule b{color:var(--ink)}
+.bar{flex:0 0 40px;display:flex;align-items:center;gap:14px;padding:0 18px;border-top:1px solid var(--line);background:#010409;
+  font:11px "IBM Plex Mono",monospace;color:var(--mut)}
+.bar b{color:var(--ink)}
+.force{margin-left:auto;display:flex;gap:6px}
+.force button{font:11px "IBM Plex Mono",monospace;background:#161b22;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;cursor:pointer}
+.force button.on{border-color:var(--ink)}
+.note{font-size:11px;color:var(--dim)}
+</style></head><body>
+<header>
+  <h1>Vibeline</h1>
+  <nav class="tabs">
+    <a href="../001-roster-liveness/index.html" class="on">001 roster</a>
+    <a href="../002-rail-pulse/index.html">002 rail pulse</a>
+    <a href="../003-type-groups/index.html">003 groups</a>
+  </nav>
+  <p class="lede">Mock. Heartbeat and type stay in the name column. Rail is unchanged — dashed live tip, END card when stopped.</p>
+</header>
+<div class="wrap">
+  <div class="stage"><div class="inner" id="inner"></div></div>
+  <aside class="panel" id="panel"></aside>
+</div>
+<footer class="bar">
+  <span>selected <b id="selname">—</b></span>
+  <span class="note">force state</span>
+  <div class="force">
+    <button data-st="idle">idle</button>
+    <button data-st="running">running</button>
+    <button data-st="stopped">stopped</button>
+  </div>
+</footer>
+<script>
+const ECG = `<svg viewBox="0 0 24 12" width="22" height="11"><polyline points="0,6 3,6 5,2 7,10 9,6 12,6 14,3 16,9 18,6 24,6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>`;
+const hb = (st, extra='') => `<span class="hb ${st}">${ECG}<em>${st==='running'?extra:st==='idle'?(extra||'idle'):'stopped'}</em></span>`;
+const S = [
+  {id:'loop-1', type:'loop', name:'Vibeline rails', agent:'cli · grok-4.6', status:'running', elapsed:'4m 12s',
+    clock:'9:14:02 PM → now', span:'4m 12s', reason:null,
+    events:[{k:'open',l:'PROMPT',t:'9:14:02 PM',x:70},{k:'spawn',l:'SPAWN',t:'9:15:40 PM',x:210},{k:'note',l:'READ',t:'9:16:18 PM',x:310},{k:'pass',l:'REPLY',t:'9:17:50 PM',x:430}],
+    child:{name:'inspect sessions.py', status:'running', elapsed:'2m 01s', events:[{k:'spawn',l:'SPAWNED',t:'9:15:40 PM',x:210},{k:'note',l:'SEARCH',t:'9:16:44 PM',x:340}]}},
+  {id:'cron-1', type:'repeat', name:'nightly ledger check', agent:'cron · every 2h', status:'idle', elapsed:'idle 38m',
+    clock:'7:00:00 PM → 7:04:11 PM', span:'4m 11s', next:'next 1h 22m', reason:null,
+    events:[{k:'open',l:'TICK',t:'7:00:00 PM',x:70},{k:'note',l:'DASH',t:'7:01:20 PM',x:200},{k:'done',l:'END',t:'7:04:11 PM',x:420}]},
+  {id:'cron-2', type:'repeat', name:'price watch', agent:'cron · every 30m', status:'stopped', elapsed:'stopped',
+    clock:'6:12:00 PM → 6:12:44 PM', span:'44s', reason:'paused',
+    events:[{k:'open',l:'TICK',t:'6:12:00 PM',x:70},{k:'done',l:'END',t:'6:12:44 PM',x:260}]},
+  {id:'cloud-1', type:'cloud', name:'modal build', agent:'modal · grok-4.6', status:'running', elapsed:'11m 04s',
+    clock:'9:07:10 PM → now', span:'11m 04s', reason:null,
+    events:[{k:'open',l:'PROMPT',t:'9:07:10 PM',x:70},{k:'note',l:'TERM',t:'9:09:02 PM',x:220},{k:'note',l:'TERM',t:'9:14:40 PM',x:480}]},
+  {id:'loop-2', type:'loop', name:'docs pass', agent:'tui · grok-4.6', status:'idle', elapsed:'idle 22m',
+    clock:'8:41:00 PM → 8:52:18 PM', span:'11m 18s', reason:null,
+    events:[{k:'open',l:'PROMPT',t:'8:41:00 PM',x:70},{k:'pass',l:'REPLY',t:'8:52:18 PM',x:500}]}
+];
+let sel = S[0].id;
+function evHTML(e){
+  if(e.k==='note') return `<div class="ev k-note" style="left:${e.x}px"><span class="dot kind-note"></span></div>`;
+  return `<div class="ev k-${e.k}" style="left:${e.x}px"><div class="leader"></div><span class="dot kind-${e.k}"></span>
+    <div class="card k-${e.k}"><b>${e.l}</b><small>${e.t}</small></div></div>`;
+}
+function rail(s, isSub){
+  const last=s.events[s.events.length-1], a=s.events[0].x, b=last.x;
+  return `<div class="railwrap" style="width:720px">
+    <div class="rail${isSub?' sub':''}${s.status!=='stopped'?' live':''}" style="left:${a}px;width:${Math.max(b-a,6)}px"></div>
+    ${s.events.map(evHTML).join('')}</div>`;
+}
+function row(s, sub){
+  const extra = sub ? '' : hb(s.status, s.status==='running'?s.elapsed: s.status==='idle'?(s.next||s.elapsed):'stopped');
+  const lab = sub ? `subagent · ${s.status}` : `${s.type} · ${s.agent}`;
+  const meta = s.status==='stopped' ? `${s.clock} · ${s.span}` : (s.next? `${s.clock} · ${s.next}` : `${s.clock} · ${s.span}`);
+  return `<div class="name"><div>
+    <div class="parent-lab">${sub?'child':s.type} ${extra}</div>
+    <b>${s.name}</b><span>${lab}</span><span class="meta">${meta}</span>
+  </div></div>${rail(s, !!sub)}`;
+}
+function paint(){
+  document.getElementById('inner').innerHTML = S.map(s=>`<div class="group${s.id===sel?' sel':''}" data-id="${s.id}">
+    <div class="row">${row(s)}</div>${s.child?`<div class="row sub">${row(s.child,true)}</div>`:''}</div>`).join('');
+  document.querySelectorAll('.group').forEach(g=>g.addEventListener('click',()=>{ sel=g.dataset.id; paint(); }));
+  const s=S.find(x=>x.id===sel);
+  document.getElementById('selname').textContent=s.name;
+  document.querySelectorAll('.force button').forEach(b=>b.classList.toggle('on', b.dataset.st===s.status));
+  document.getElementById('panel').innerHTML=`
+    <p class="kicker"><b>${s.type.toUpperCase()}</b> · ${s.agent}</p>
+    <h2>${s.name}</h2>
+    <p class="brief">Conservative slice: type chip + heartbeat in the name column. Rail markers unchanged.</p>
+    <dl>
+      <dt>roster</dt><dd>${s.status==='running'?'green + '+s.elapsed:s.status==='idle'?'yellow idle':'red stopped'}</dd>
+      <dt>timeline</dt><dd>${s.status==='stopped'?'END card · '+(s.reason||'closed'):'existing live dash, no pulse icon'}</dd>
+    </dl>
+    <div class="rule">${s.status==='stopped'?'Stopped uses current config: <b>Session ended · '+(s.reason||'closed')+'</b>. No red heartbeat on the rail.':'Heartbeat is only in the roster. Smaller incorporate.'}</div>`;
+}
+document.querySelectorAll('.force button').forEach(b=>b.addEventListener('click',e=>{
+  e.stopPropagation();
+  const s=S.find(x=>x.id===sel); s.status=b.dataset.st;
+  if(s.status==='running'){s.elapsed='1m 04s'; s.reason=null;}
+  if(s.status==='idle'){s.elapsed='idle 3m';}
+  if(s.status==='stopped'){s.elapsed='stopped'; s.reason=s.reason||'paused';
+    if(!s.events.some(ev=>ev.k==='done')) s.events=[...s.events,{k:'done',l:'END',t:'now',x:s.events.at(-1).x+90}];}
+  paint();
+}));
+paint();
+</script>
+</body></html>

@@ -1,0 +1,2 @@
+# Runtime needs only the Python standard library (rich comes with Hermes).
+pytest>=7
