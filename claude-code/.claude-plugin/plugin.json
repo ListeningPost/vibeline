@@ -1,0 +1,10 @@
+{
+  "name": "vibeline",
+  "version": "0.2.0",
+  "description": "Agent work as rails: every Claude Code session as a lane, subagents branching at spawn, tool calls and acceptance-criteria results as marks. Live web page, markdown rails, harness-ledger reader.",
+  "author": { "name": "ListeningPost (original Hermes plugin); Claude Code port" },
+  "homepage": "https://github.com/ListeningPost/vibeline",
+  "repository": "https://github.com/ListeningPost/vibeline",
+  "license": "MIT",
+  "keywords": ["rails", "ledger", "sessions", "subagents", "timeline", "observability"]
+}

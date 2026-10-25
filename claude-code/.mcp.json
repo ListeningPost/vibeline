@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "vibeline": {
+      "command": "${VIBELINE_PYTHON:-python}",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/vibeline", "mcp"]
+    }
+  }
+}

@@ -13,6 +13,10 @@ Three surfaces, same data:
 
 Runtime dependencies: Python 3.10+ standard library only. `rich` is used if present (Hermes ships it).
 
+**Claude Code:** a port lives in [`claude-code/`](claude-code/README.md). It draws the same rails from Claude Code
+session transcripts (subagents as child rails) and the harness ledger. Install with
+`claude plugin marketplace add ListeningPost/vibeline` then `claude plugin install vibeline@vibeline`.
+
 ## Screenshots
 
 **Web UI, Sessions view.** Every Hermes session on the machine, subagents as child rails branching at spawn,

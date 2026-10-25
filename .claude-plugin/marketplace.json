@@ -1,0 +1,11 @@
+{
+  "name": "vibeline",
+  "owner": { "name": "ListeningPost" },
+  "plugins": [
+    {
+      "name": "vibeline",
+      "source": "./claude-code",
+      "description": "Agent work as rails for Claude Code sessions and the harness ledger."
+    }
+  ]
+}
