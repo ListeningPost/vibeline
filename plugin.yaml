@@ -4,6 +4,7 @@ description: "Render agent-harness rails as markdown in the Hermes CLI session. 
 author: ListeningPost
 license: MIT
 manifest_version: 2
+requires_hermes: ">=0.22.0"
 api_version: 1
 tags: [rails, ledger, cli, markdown]
 provides_tools:

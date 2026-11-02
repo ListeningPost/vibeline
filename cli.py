@@ -9,10 +9,10 @@ from . import sessions as hermes_sessions
 
 def _print_md(md: str) -> None:
     try:
-        from hermes_cli.cli_render import _render_final_assistant_content
         from rich.console import Console
+        from rich.markdown import Markdown
 
-        Console().print(_render_final_assistant_content(md))
+        Console().print(Markdown(md))
     except Exception:
         print(md, end="" if md.endswith("\n") else "\n")
 

@@ -117,6 +117,19 @@ python3 /path/to/vibeline rails
 python3 /path/to/vibeline web --open
 ```
 
+## What vibeline touches (disclosure)
+
+- **Reads outside its own data:** `~/.hermes/state.db` (Hermes session store, opened read-only) and the ledger
+  SQLite you point it at. It never writes to either.
+- **Writes:** `~/.hermes/tui-widgets/rails.mjs` (the TUI widget) at registration and on each `/rails`.
+- **Shell commands:** `hermes vibeline open` and the web UI's open/resume button launch your terminal emulator
+  running `hermes --resume <id>`. Nothing runs without that explicit action.
+- **Background processes:** `hermes vibeline web` runs a local HTTP server bound to `127.0.0.1` until you stop it.
+- **Network:** none. The web UI is served locally and loads no third-party resources.
+- **Credentials and telemetry:** none read, none stored, none sent.
+- **Environment variables read:** `HERMES_HOME`, `VIBELINE_DB`, `TRACE_DB`, `VIBELINE_TERMINAL`, `DISPLAY`,
+  `WAYLAND_DISPLAY`. None are secrets.
+
 ## Tools exposed to the model
 
 - `vibeline_rails {task_id?, db?, show_tokens?}` returns `{ok, task_id, db, markdown}`
