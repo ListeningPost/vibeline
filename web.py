@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from .ledger import connect, load_all, verify_chain
+from .ledger import EXAMPLE_DB, connect, load_all, verify_chain
 from .rails import _epoch, group
 from . import feedback, peers, rewind, sessions, spawn, swarm
 
@@ -242,6 +242,7 @@ def make_server(
             if hub.peers and not local and not only and src != "ledger":
                 out = hub.merge(src, out, sessions.MAX_SESSIONS)
         out["machine"] = name
+        out["has_ledger"] = db is not None and Path(db).resolve() != EXAMPLE_DB  # the bundled sample doesn't earn a tab
         out["can"] = {"open": src == "sessions" and not read_only, "rewind": src == "sessions" and not read_only, "feedback": src == "sessions"}
         return out
 

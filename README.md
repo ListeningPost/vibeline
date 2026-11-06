@@ -30,6 +30,7 @@ expected TDD RED on `store`, and the acceptance-criteria PASS/DONE on the parent
 ![CLI panel](docs/cli-panel.png)
 
 The web captures use a mock `state.db` and the bundled sample ledger, so what you see on a fresh install matches.
+The Ledger tab is hidden until a real ledger is configured; `/?src=ledger` still opens the bundled sample.
 
 ## Quick start (5 minutes)
 
@@ -59,6 +60,11 @@ outline slow. *Tool time* is the assistant message to the last tool result; *mod
 step. `auto` compares a tool with its own median on screen (slow = 3x typical and at least 2s); pick a fixed
 threshold (1s to 5m) instead if you prefer, and tick *slow only* to hide the rest. `?heat=1` opens a link in
 this mode.
+
+**Shell steps.** A terminal tool call is labelled with the program it ran, `shell: pytest` or `shell: git`,
+read from the command line: `cd`, `echo`, `sudo`, `timeout`, pipes and `bash -c` wrappers are looked through,
+and `npx tsc` or `python -m pytest` name the tool they run. The step title lists everything the script ran.
+The stopwatch's *typical* is then per command, so a slow `ls` is not hidden by `pytest` being slow.
 
 **Feedback (`f`).** Rate any step 👍 / 😐 / 👎, add a note saying why, and tick "*tool* is performing poorly"
 to flag a tool across every call. Ratings live in `~/.hermes/vibeline/feedback.db` (override with

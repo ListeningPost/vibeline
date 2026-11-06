@@ -138,7 +138,7 @@ header{flex:0 0 auto}
 .gap i{display:none}
 .k-note{color:#58a6ff} .k-red{color:var(--fix)}
 .card.k-note b{color:#58a6ff}
-.card b{max-width:62px;overflow:hidden;text-overflow:ellipsis;margin:0 auto} .card.k-red b{color:var(--fix)}
+.card b{max-width:62px;overflow:hidden;text-overflow:ellipsis;margin:0 auto} .card.sh b{max-width:var(--bw);letter-spacing:0} .card.k-red b{color:var(--fix)}
 .dot.kind-note{width:7px;height:7px;left:-3.5px;top:-3.5px}
 .live{margin-left:auto;font:11px var(--mono);color:var(--mut);display:flex;align-items:center;gap:6px}
 .live i{width:7px;height:7px;border-radius:50%;background:var(--ok)}
@@ -150,6 +150,11 @@ header{flex:0 0 auto}
 .bar .lab{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-right:6px}
 .bar .ok{color:var(--ok)} .bar .bad{color:var(--bad)}
 .bar .db{margin-left:auto;overflow:hidden;text-overflow:ellipsis}
+body.panning,body.panning *{cursor:grabbing!important;user-select:none}
+.bar .zoom{flex:0 0 auto;display:flex;align-items:center;gap:3px}
+.bar .zoom button{font:11px var(--mono);color:var(--mut);background:transparent;border:1px solid var(--line);border-radius:4px;padding:2px 7px;cursor:pointer}
+.bar .zoom button:hover{color:var(--ink);border-color:var(--mut)}
+.bar .zoom .pct{min-width:50px;color:var(--ink)}
 .brief{margin:0 0 12px}
 dl{grid-template-columns:70px minmax(0,1fr)} dd{overflow-wrap:anywhere}
 .ac li{margin-bottom:8px}
@@ -158,10 +163,10 @@ dl{grid-template-columns:70px minmax(0,1fr)} dd{overflow-wrap:anywhere}
 .ac .hist a:hover{color:var(--ink)}
 details{margin:4px 0 0 14px} summary{cursor:pointer;color:var(--mut);font-size:11px}
 .log{list-style:none;margin:0;padding:0;font-size:11px}
-.log li{display:grid;grid-template-columns:62px 54px minmax(0,1fr);gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer}
+.log li{display:grid;grid-template-columns:62px 96px minmax(0,1fr);gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer}
 .log li:hover,.log li.on{background:#161b22}
 .log time{font-family:var(--mono);font-size:10px;color:var(--mut)}
-.log b{font:600 10px var(--mono)}
+.log b{font:600 10px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .log span{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}
 .stats div{background:#161b22;border-radius:8px;padding:8px 10px}
@@ -209,7 +214,14 @@ body:not(.canfb) #fb{display:none}
 .heat .ev.h-mid,.heat .ev.h-mid .card,.heat .ev.h-mid .card b{color:var(--mid)}
 .heat .ev.h-hot,.heat .ev.h-hot .card,.heat .ev.h-hot .card b{color:var(--hot)}
 .heat .ev.h-cold .dot,.heat .ev.h-mid .dot,.heat .ev.h-hot .dot{background:currentColor;opacity:1}
+.heat .ev.h-cold .card,.heat .ev.h-mid .card{border-color:currentColor}
+.heat .ev.h-cold .leader,.heat .ev.h-mid .leader,.heat .ev.h-hot .leader{background:currentColor;opacity:.7}
 .heat .ev.h-hot{z-index:5}
+.legend{border:1px solid var(--line);border-radius:8px;background:#0f1319;padding:10px 12px;display:grid;gap:10px}
+.legend div{display:grid;grid-template-columns:18px 1fr;font-size:12px}
+.legend .sw{margin:4px 0 0;width:10px;height:10px}
+.legend span{grid-column:2;font:10px var(--mono);color:var(--mut)}
+.h-hot-t{color:var(--hot)} .h-mid-t{color:var(--mid)} .h-cold-t{color:var(--cold)}
 .heat .ev.h-hot .dot{outline:2px solid var(--hot);outline-offset:2px;box-shadow:0 0 12px 4px rgba(255,77,77,.8)}
 .heat .ev.h-hot .card{border-color:var(--hot);box-shadow:0 0 10px rgba(255,77,77,.55)}
 .heat.slowonly .ev:not(.h-hot){opacity:.1}
@@ -273,6 +285,8 @@ let DATA = null;
 let FOCUS = Q0.get('session');
 function chrome(){
   document.body.classList.toggle('focus', !!FOCUS);
+  // The Ledger tab appears once a real harness ledger exists; /?src=ledger still opens the bundled sample.
+  document.querySelector('#nav a[data-src="ledger"]').hidden = !(SRC==='ledger' || (DATA && DATA.has_ledger));
   document.body.classList.toggle('sessions', !!(DATA && DATA.can && DATA.can.open));
   document.body.classList.toggle('canfb', !!(DATA && DATA.can && DATA.can.feedback));
   document.getElementById('lede').textContent = (FOCUS && DATA && DATA.parents[0]) ? DATA.parents[0].name : '';
@@ -282,7 +296,7 @@ function chrome(){
 chrome();
 /* open one session on its own, or go back to the list */
 function focusOn(id, push=true){
-  FOCUS=id; DATA=null; chrome();
+  FOCUS=id; DATA=null; ZOOM=1; chrome();
   if(push) history.pushState(null,'',pageURL({session:id}));
   load();
 }
@@ -296,7 +310,7 @@ const idle = msv => { const m=Math.round(msv/60000); return m<90 ? `${m}m` : m<2
 const num = n => (n||0).toLocaleString();
 const tok = n => n ? num(n)+' tok' : '— tok';
 const stat = s => s==='in_progress' ? 'running' : s;
-const inner = document.getElementById('inner');
+const inner = document.getElementById('inner'), stage = document.getElementById('stage');
 // In the list, tool calls are dots. With one session in focus every step gets a card, as in the ledger view.
 const isQuiet = e => e.child || (e.quiet && !FOCUS);
 const lanesOf = p => p._lanes ??= [{id:p.id, name:p.agent, status:p.status, events:p.events, tokens:p.lane_tokens, meta:p.meta}, ...p.subs.map(s=>({id:s.id, name:s.name, status:s.status, events:s.events, tokens:s.tokens, meta:s.meta}))];
@@ -331,7 +345,7 @@ let FB = {ratings:{}, tools:{}};
 let FBMODE = Q0.has('fb') ? Q0.get('fb')!=='0' : !!store.get('fbmode',false);
 const RCLS = {'1':'up','0':'mid','-1':'down'};
 
-/* heat + feedback are classes on the marks, so toggling them never rebuilds the rails */
+/* heat + feedback are classes on the marks; only the stopwatch in the list redraws, to hand out cards */
 function decorate(){
   document.body.classList.toggle('heat',HEAT.on);
   document.body.classList.toggle('slowonly',HEAT.on&&HEAT.only);
@@ -362,6 +376,8 @@ const termBtn = (id, status) => canOpen()
 /* ---------- time scale with folded idle gaps ---------- */
 const GAPW = 76, PAD = 60;
 let PX, T0, segs, gaps, WIDTH;
+const ZMIN = 0.1, ZMAX = 40;
+let ZOOM = 1, FIT = 1;   // ZOOM stretches the time axis only; FIT is the zoom at which everything fits the stage
 function scale(){
   const all=[]; DATA.parents.forEach(p=>lanesOf(p).forEach(l=>l.events.forEach(e=>all.push(ms(e.t)))));
   const ts=[...new Set(all)].sort((a,b)=>a-b);
@@ -375,7 +391,9 @@ function scale(){
   const room=document.getElementById('stage').clientWidth-NAMEW-PAD-140-(segs.length-1)*GAPW;
   const busiest=Math.max(...DATA.parents.flatMap(p=>lanesOf(p).map(l=>l.events.length)));
   const mins=Math.max(active,0.25);
-  PX=FOCUS ? Math.min(Math.max(room/mins, busiest*41/mins, 40),1200) : Math.max(18,Math.min(900/Math.max(active,1),70));
+  const base=FOCUS ? Math.min(Math.max(room/mins, busiest*41/mins, 40),1200) : Math.max(18,Math.min(900/Math.max(active,1),70));
+  PX=base*ZOOM;
+  FIT=active>0 ? clamp((stage.clientWidth-NAMEW-PAD-210-(segs.length-1)*GAPW)/(active*base),ZMIN,ZMAX) : 1;
   let x=PAD; gaps=[];
   segs.forEach((s,i)=>{ s.x=x; x+=((s.b-s.a)/60000)*PX; if(i<segs.length-1){ gaps.push({x, w:GAPW, a:s.b, b:segs[i+1].a}); x+=GAPW; } });
   WIDTH=x+120;
@@ -385,6 +403,24 @@ function toX(t){ t=ms(t);
     if(t<=s.b) return s.x + Math.max(0,(t-s.a)/60000)*PX;
     if(i<segs.length-1 && t<segs[i+1].a) return gaps[i].x + GAPW/2; }
   const s=segs[segs.length-1]; return s.x+((t-s.a)/60000)*PX; }
+const clamp = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+/* a point on the axis that survives a rescale: minutes into a segment, or pixels into a folded gap (gaps keep their width) */
+function anchorAt(x){
+  for(let i=0;i<segs.length;i++){ const s=segs[i], last=i===segs.length-1;
+    if(last || x<=s.x+((s.b-s.a)/60000)*PX) return {i, m:Math.max(0,x-s.x)/PX, pad:Math.min(0,x-s.x)};
+    if(x<gaps[i].x+GAPW) return {i, g:x-gaps[i].x}; }
+}
+const anchorX = a => a.g!=null ? gaps[a.i].x+a.g : segs[a.i].x+a.m*PX+a.pad;
+function zoomTo(z, clientX){
+  if(!DATA || DATA.error || !DATA.parents.length) return;
+  z=clamp(z,ZMIN,ZMAX); if(Math.abs(z-ZOOM)<1e-4) return;
+  // keep the moment under the cursor (or the middle of the rails) where it is
+  const off=clientX==null ? NAMEW+(stage.clientWidth-NAMEW)/2 : Math.max(clientX-stage.getBoundingClientRect().left,NAMEW);
+  const a=anchorAt(stage.scrollLeft+off-NAMEW);
+  ZOOM=z; render(true);
+  stage.scrollLeft=Math.max(0,anchorX(a)+NAMEW-off);
+}
+const zoomBy = (f,clientX) => zoomTo(ZOOM*f,clientX);
 
 /* ---------- panel ---------- */
 function find(id){
@@ -419,10 +455,17 @@ function paint(hit, force){
   const ae=document.activeElement;   // a live refresh must not eat a half-typed note
   if(!force && PANEL===d.id && ae && ae.closest && ae.closest('.fb')) return;
   PANEL=d.id;
-  const typ=d.dur_ms!=null && typical(d,'tool')!=null ? ` <span class="dim">· typical ${esc(d.label)} ${sec(typical(d,'tool'))}</span>` : '';
+  const tt=d.dur_ms!=null ? typical(d,'tool') : null, hc=HEAT.on ? heatOf(d) : null, HN={hot:'slow',mid:'typical',cold:'fast'};
+  const verdict=m=>hc&&HEAT.metric===m ? ` <b class="h-${hc}-t">· ${HN[hc]}</b>` : '';
+  const typ=tt!=null ? ` <span class="dim">· typical ${esc(d.label)} ${sec(tt)}${tt>0?' · '+(d.dur_ms/tt).toFixed(1)+'×':''}</span>` : '';
+  const auto=HEAT.thr==='auto', T=+HEAT.thr*1000, own=HEAT.metric==='tool' ? "the tool's own median" : 'the median wait on screen';
+  const legend=HEAT.on ? `<h3>How steps are coloured</h3><div class="legend">
+      <div><i class="sw" style="background:var(--cold)"></i><b>fast</b><span>${auto?'at most half '+own:'under '+sec(T/4)}</span></div>
+      <div><i class="sw" style="background:var(--mid)"></i><b>typical</b><span>${auto?'around '+own:sec(T/4)+' to '+sec(T)}</span></div>
+      <div><i class="sw" style="background:var(--hot)"></i><b>slow</b><span>${auto?'3× typical and at least 2s':'at least '+sec(T)}</span></div></div>` : '';
   const calls=(d.calls||[]).length>1 ? d.calls.map(c=>`${esc(c.name)} ${c.ms==null?'running':sec(c.ms)}`).join(' · ') : '';
-  const timing=`${d.dur_ms!=null?`<dt>tool time</dt><dd>${sec(d.dur_ms)}${typ}</dd>`:''}${calls?`<dt>calls</dt><dd>${calls}</dd>`:''}
-      ${d.wait_ms!=null&&d.raw_kind!=='user'?`<dt>model wait</dt><dd>${sec(d.wait_ms)} <span class="dim">before this step</span></dd>`:''}
+  const timing=`${d.dur_ms!=null?`<dt>tool time</dt><dd>${sec(d.dur_ms)}${verdict('tool')}${typ}</dd>`:''}${calls?`<dt>calls</dt><dd>${calls}</dd>`:''}
+      ${d.wait_ms!=null&&d.raw_kind!=='user'?`<dt>model wait</dt><dd>${sec(d.wait_ms)}${verdict('wait')} <span class="dim">before this step</span></dd>`:''}
       ${d.ghost?'<dt>state</dt><dd>rewound · no longer in the session</dd>':''}${multi()&&p.machine?`<dt>machine</dt><dd>${esc(p.machine)}</dd>`:''}`;
   const link=(e,txt)=>`<a href="#${e.id}" onclick="select('${e.id}');return false">${txt}</a>`;
   const nav=`<p class="lanenav">${prev?link(prev,`← ${esc(lab(prev))} ${fmt(prev.t)}`):'<span></span>'}
@@ -443,6 +486,7 @@ function paint(hit, force){
       ${meta}
     </dl>
     ${nav}
+    ${legend}
     ${fbHTML(d)}
     ${canOpen() && l.id ? `<button class="go" onclick="openTerm('${esc(l.id)}')">${l.status==='complete'?'Resume':'Open'} terminal · ${esc(l.id)}</button>` : ''}
     ${rewindHTML(p,l,i)}
@@ -455,22 +499,36 @@ function paint(hit, force){
 
 /* ---------- markers with dodged cards ---------- */
 const CARDW = 76, CARDGAP = 6;
+// A shell step's card is as wide as its `shell: <command>` label needs, up to a limit.
+const cardW = e => e.cmd ? Math.min(132, Math.max(CARDW, Math.ceil((e.label.length+(e.n>1?3:0))*6.1)+16)) : CARDW;
 function layoutCards(events){
   const sorted=[...events].sort((a,b)=>ms(a.t)-ms(b.t));
-  const lastX={t1:-1e9, t2:-1e9};
-  return sorted.map(e=>{
+  const lastX={t1:-1e9, t2:-1e9}, lastW={t1:CARDW, t2:CARDW};
+  const out=sorted.map(e=>{
     const x=toX(e.t);
-    if(isQuiet(e)) return {e,x,cx:x,tier:'t1'};
+    if(isQuiet(e)) return {e,x,cx:x,tier:'t1',card:false};
     let tier='t1', cx=x;
-    if(x >= lastX.t1+CARDW+CARDGAP) tier='t1';
-    else if(x >= lastX.t2+CARDW+CARDGAP) tier='t2';
-    else { const s1=lastX.t1+CARDW+CARDGAP-x, s2=lastX.t2+CARDW+CARDGAP-x; tier = s1<=s2?'t1':'t2'; cx = x+Math.min(s1,s2); }
-    lastX[tier]=cx;
-    return {e,x,cx,tier};
+    const w=cardW(e), n1=lastX.t1+(lastW.t1+w)/2+CARDGAP, n2=lastX.t2+(lastW.t2+w)/2+CARDGAP;
+    if(x >= n1) tier='t1';
+    else if(x >= n2) tier='t2';
+    else { const s1=n1-x, s2=n2-x; tier = s1<=s2?'t1':'t2'; cx = x+Math.min(s1,s2); }
+    lastX[tier]=cx; lastW[tier]=w;
+    return {e,x,cx,tier,card:true};
   });
+  // Stopwatch in the list: cards go to the timed steps first, slowest first, each only where it fits over its own dot.
+  // Prompts and replies take what is left; anything without room stays a dot until zooming in makes room.
+  if(HEAT.on && !FOCUS){
+    const taken={t1:[],t2:[]}, rank={hot:0,mid:1,cold:2};
+    out.forEach(o=>{ o.h=o.e.child ? null : heatOf(o.e); o.plain=o.card && !o.h; o.card=false; o.cx=o.x; });
+    [...out.filter(o=>o.h && (o.h==='hot'||!HEAT.only)).sort((a,b)=>rank[a.h]-rank[b.h]), ...out.filter(o=>o.plain)].forEach(o=>{
+      const w=cardW(o.e), tier=['t1','t2'].find(t=>taken[t].every(c=>Math.abs(c.x-o.x)>=(c.w+w)/2+CARDGAP));
+      if(tier){ o.card=true; o.tier=tier; taken[tier].push({x:o.x,w}); }
+    });
+  }
+  return out;
 }
-function evHTML(e,x,cx,tier){
-  if(isQuiet(e)) return `<div class="ev k-${e.kind} quiet${e.ghost?' ghost':''}" data-id="${e.id}" style="left:${x}px" title="${esc(e.title)}"><span class="dot kind-${e.kind}"></span></div>`;
+function evHTML(e,x,cx,tier,card){
+  if(!card) return `<div class="ev k-${e.kind} quiet${e.ghost?' ghost':''}" data-id="${e.id}" style="left:${x}px" title="${esc(e.title)}"><span class="dot kind-${e.kind}"></span></div>`;
   const h = tier==='t1' ? 11 : 44;
   const dx = cx-x;
   const leader = Math.abs(dx)>1
@@ -480,22 +538,23 @@ function evHTML(e,x,cx,tier){
   return `<div class="ev k-${e.kind}${e.ghost?' ghost':''}" data-id="${e.id}" style="left:${x}px">
     ${leader}
     <span class="dot kind-${e.kind}"></span>
-    <div class="card ${tier} k-${e.kind}" style="left:${dx}px"><b>${esc(e.label)}${e.n>1?' ×'+e.n:''}</b><small>${fmt(e.t)}</small></div>
+    <div class="card ${tier} k-${e.kind}${e.cmd?' sh':''}" style="left:${dx}px${e.cmd?`;--bw:${cardW(e)-16}px`:''}" title="${esc(e.title)}"><b>${esc(e.label)}${e.n>1?' ×'+e.n:''}</b><small>${fmt(e.t)}</small></div>
   </div>`;
 }
 function railHTML(events, isSub, status, end){
   const a=toX(events[0].t), b=toX(end ?? events[events.length-1].t);
   const cls=(isSub?' sub':'')+(status==='in_progress'?' live':'')+(status==='blocked'?' live blocked':'');
   const gapsHtml = gaps.map(g=>`<div class="gap" style="left:${g.x}px;width:${g.w}px"><i>${idle(g.b-g.a)} idle</i></div>`).join('');
-  const evs = layoutCards(events).map(o=>evHTML(o.e,o.x,o.cx,o.tier)).join('');
+  const evs = layoutCards(events).map(o=>evHTML(o.e,o.x,o.cx,o.tier,o.card)).join('');
   return `<div class="railwrap" style="width:${WIDTH}px">${gapsHtml}
     <div class="rail${cls}" style="left:${a}px;width:${Math.max(b-a,6)}px"></div>${evs}</div>`;
 }
 
 /* ---------- build ---------- */
 const folded = new Set();
-function render(){
+function render(keep){   // keep===true: a redraw of the same data (zoom, stopwatch), so hold the selection and the scroll
   if(DATA.error){ inner.innerHTML=`<p class="empty">${esc(DATA.error)}</p>`; document.getElementById('bar').innerHTML=''; return; }
+  const held=keep===true ? (document.querySelector('.ev.on')||{dataset:{}}).dataset.id : null, top=stage.scrollTop;
   if(!DATA.parents.length){ inner.innerHTML='<p class="empty">Nothing recorded yet.</p>'; bar(); return; }
   scale(); heatStats();
   const noun = DATA.src==='swarm' ? 'swarm' : DATA.src==='ledger' ? 'task' : 'session', kid = DATA.src==='swarm' ? 'cards' : 'subagents';
@@ -545,14 +604,17 @@ function render(){
   foot.innerHTML='<div class="foot-lab">clock</div>';
   const track=document.createElement('div'); track.className='foot-track'; track.style.width=WIDTH+'px';
   foot.appendChild(track); inner.appendChild(foot);
-  segs.forEach(s=>{
-    const first=new Date(s.a); first.setSeconds(0,0);
-    for(let t=first.getTime(); t<=s.b+60000; t+=60000){
-      if(t<s.a-60000) continue;
-      const d=new Date(t); const maj=d.getMinutes()%5===0;
-      const el=document.createElement('div'); el.className='tk'+(maj?' maj':''); el.style.left=toX(t)+'px';
-      const nearGap=gaps.some(g=>Math.abs(toX(t)-g.x)<34||Math.abs(toX(t)-(g.x+g.w))<34);
-      if(maj&&!nearGap) el.innerHTML=`<span>${fmtM(d)}</span>`;
+  // ticks at least 8px apart, labels at least 90px apart, whatever the zoom
+  const STEPS=[5,10,15,30,60,300,600,900,1800,3600,7200,14400,43200,86400].map(v=>v*1000);
+  const pick=px=>STEPS.find(v=>v/60000*PX>=px) || STEPS[STEPS.length-1];
+  const tickMs=pick(8), labMs=pick(90);
+  segs.forEach((s,si)=>{
+    const end=si===segs.length-1 ? s.b+tickMs : s.b;
+    for(let t=Math.ceil(s.a/tickMs)*tickMs; t<=end; t+=tickMs){
+      const x=toX(t), maj=t%labMs===0;
+      const el=document.createElement('div'); el.className='tk'+(maj?' maj':''); el.style.left=x+'px';
+      const nearGap=gaps.some(g=>Math.abs(x-g.x)<34||Math.abs(x-(g.x+g.w))<34);
+      if(maj&&!nearGap) el.innerHTML=`<span>${labMs<60000?fmt(t):fmtM(t)}</span>`;
       track.appendChild(el);
     }
   });
@@ -562,6 +624,12 @@ function render(){
   guide=document.createElement('div'); guide.className='guide'; guide.innerHTML='<em></em>'; inner.appendChild(guide);
   drawLinks();
   decorate();
+  stage.scrollTop=top;
+  if(keep===true){
+    const hit=held&&find(held), el=hit&&document.querySelector(`.ev[data-id="${held}"]`);
+    if(el){ el.classList.add('on'); showGuide(toX(hit.e.t),fmt(hit.e.t)); }
+    return;
+  }
   const want=location.hash.slice(1);
   if(!(want && select(want))){
     // Nothing pinned: follow the newest event.
@@ -678,7 +746,8 @@ function bar(){
     <span><span class="lab">running</span><b class="${t.running?'ok':''}">${t.running}</b></span>
     ${multi()?`<span><span class="lab">machines</span>${DATA.machines.map(m=>`<span class="chip${m.ok?'':' down'}" title="${esc(m.ok?m.sessions+' shown':m.error)}">${esc(m.name)}${m.ok?'':' · down'}</span>`).join(' ')}</span>`:''}
     ${HEAT.on?`<span><span class="lab">${HEAT.metric==='tool'?'tool time':'model wait'}</span><i class="sw" style="background:var(--cold);margin-left:0"></i>fast<i class="sw" style="background:var(--mid)"></i>typical<i class="sw" style="background:var(--hot)"></i>slow · <b>${document.querySelectorAll('.ev.h-hot').length}</b> slow</span>`:''}
-    <span class="db">${esc(DATA.db)}</span>`;
+    <span class="db">${esc(DATA.db)}</span>
+    <span class="zoom" title="Zoom the time axis: Ctrl + wheel or pinch, + and − keys, 0 to reset, double-click a rail to fit"><button onclick="zoomBy(1/1.4)">−</button><button class="pct" onclick="zoomTo(1)">${Math.round(ZOOM*100)}%</button><button onclick="zoomBy(1.4)">+</button><button onclick="zoomTo(FIT)">fit</button></span>`;
 }
 
 /* ---------- live ---------- */
@@ -693,7 +762,7 @@ async function tick(){
 }
 document.getElementById('back').addEventListener('click',()=>focusOn(null));
 document.getElementById('open').addEventListener('click',()=>openTerm(FOCUS || laneSession()));
-const setHeat=o=>{ Object.assign(HEAT,o); store.set('heat',HEAT); decorate(); repaint(); };
+const setHeat=o=>{ Object.assign(HEAT,o); store.set('heat',HEAT); DATA&&!DATA.error&&DATA.parents.length&&!FOCUS ? render(true) : decorate(); repaint(); };
 document.getElementById('heat').addEventListener('click',()=>setHeat({on:!HEAT.on}));
 document.getElementById('hmetric').addEventListener('change',e=>setHeat({metric:e.target.value}));
 document.getElementById('hthr').addEventListener('change',e=>setHeat({thr:e.target.value}));
@@ -704,6 +773,9 @@ window.addEventListener('keydown',e=>{
   if(e.target.closest && e.target.closest('textarea,input,select')) return;
   if(e.ctrlKey||e.metaKey||e.altKey) return;
   if(e.key==='h') setHeat({on:!HEAT.on});
+  if(e.key==='+'||e.key==='=') zoomBy(1.4);
+  if(e.key==='-') zoomBy(1/1.4);
+  if(e.key==='0') zoomTo(1);
   if(e.key==='f' && DATA && DATA.can && DATA.can.feedback) setFB(!FBMODE);
   if(e.key==='Escape'&&FOCUS) focusOn(null);
   if(e.key==='t' && !e.ctrlKey && !e.metaKey && !e.altKey && canOpen()) openTerm(laneSession());
@@ -715,4 +787,28 @@ live.title='Click to follow the newest event';
 live.style.cursor='pointer';
 live.addEventListener('click',()=>{ history.replaceState(null,'',location.pathname+location.search); DATA&&render(); });
 decorate(); loadFB(); tick(); setInterval(tick,2000);
+/* zoom the time axis: Ctrl/⌘ + wheel (a trackpad pinch arrives the same way), anchored at the cursor. A plain wheel still scrolls. */
+let zWant=null, zX=0;
+stage.addEventListener('wheel',e=>{
+  if(!(e.ctrlKey||e.metaKey)) return;
+  e.preventDefault();
+  const d=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?stage.clientHeight:1);
+  const first=zWant==null; zWant=clamp((first?ZOOM:zWant)*Math.exp(-d*0.002),ZMIN,ZMAX); zX=e.clientX;
+  if(first) requestAnimationFrame(()=>{ const z=zWant; zWant=null; zoomTo(z,zX); });
+},{passive:false});
+/* hold the middle button and drag to pan the timelines */
+let pan=null;
+stage.addEventListener('mousedown',e=>{
+  if(e.button!==1) return;
+  e.preventDefault();   // no autoscroll puck, no primary-selection paste
+  pan={x:e.clientX,y:e.clientY,l:stage.scrollLeft,t:stage.scrollTop}; document.body.classList.add('panning');
+});
+window.addEventListener('mousemove',e=>{
+  if(!pan) return;
+  if(!(e.buttons&4)){ pan=null; document.body.classList.remove('panning'); return; }
+  stage.scrollLeft=pan.l-(e.clientX-pan.x); stage.scrollTop=pan.t-(e.clientY-pan.y);
+});
+window.addEventListener('mouseup',e=>{ if(e.button===1&&pan){ pan=null; document.body.classList.remove('panning'); } });
+stage.addEventListener('auxclick',e=>{ if(e.button===1) e.preventDefault(); });
+stage.addEventListener('dblclick',e=>{ if(e.target.closest('.ev,.name,.foot,button,a')) return; zoomTo(FIT); getSelection().removeAllRanges(); });
 </script></body></html>
