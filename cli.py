@@ -38,6 +38,8 @@ def run(args) -> None:
         inner = " ".join(out["cmd"])
         how = "dry-run" if out.get("dry") else "opened"
         print(f"vibeline: {how} {out['terminal']} → {inner}" + (f"  ({out['cwd']})" if out.get("cwd") else ""))
+        if out.get("attach"):
+            print(f"vibeline: attach with: {out['attach']}")
         return
     if cmd == "dashboard":
         tasks = list_tasks(db)

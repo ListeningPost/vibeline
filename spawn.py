@@ -1,4 +1,7 @@
-"""Spawn a terminal running `hermes --resume` for a session shown in the UI."""
+"""Spawn a terminal running `hermes --resume` for a session shown in the UI.
+
+On a machine with no graphical session (a server reached through another machine's page) the session starts in a
+detached tmux session instead, and the caller gets the `tmux attach` command to show."""
 from __future__ import annotations
 
 import os
@@ -147,6 +150,23 @@ def pick_terminal() -> tuple[str, Callable[[list[str], str | None, str], list[st
     raise SpawnError("no terminal emulator found")
 
 
+def tmux_name(sid: str) -> str:
+    """tmux session names can't hold `.` or `:`."""
+    return "vibeline-" + "".join(c if c.isalnum() or c in "-_" else "_" for c in sid)
+
+
+def _wants_tmux() -> bool:
+    forced = Path((os.environ.get("VIBELINE_TERMINAL") or "").strip()).name == "tmux"
+    return forced or not _has_display()
+
+
+def _tmux_has(exe: str, name: str, run: Callable[..., Any]) -> bool:
+    try:
+        return run([exe, "has-session", "-t", f"={name}"], capture_output=True, timeout=5).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def terminal_argv(inner: list[str], cwd: str | None, title: str) -> list[str]:
     which, builder = pick_terminal()
     argv = builder(inner, cwd, title)
@@ -154,7 +174,7 @@ def terminal_argv(inner: list[str], cwd: str | None, title: str) -> list[str]:
     return argv
 
 
-def plan(sid: str, db: Path, query: str | None = None) -> dict[str, Any]:
+def plan(sid: str, db: Path, query: str | None = None, tmux: bool = False) -> dict[str, Any]:
     if not _ok_id(sid):
         raise SpawnError("bad session id")
     row = sessions.get(db, sid)
@@ -165,8 +185,18 @@ def plan(sid: str, db: Path, query: str | None = None) -> dict[str, Any]:
         cwd = None
     title = f"hermes · {row.get('title') or sid}"
     inner = hermes_argv(sid, query)
-    argv = terminal_argv(inner, cwd, title)
+    attach = None
+    if tmux:
+        exe = shutil.which("tmux")
+        if not exe:
+            raise SpawnError("no graphical session here and tmux is not installed")
+        name = tmux_name(sid)
+        argv = [exe, "new-session", "-d", "-s", name, *(["-c", cwd] if cwd else []), *inner]
+        attach = f"tmux attach -t {name}"
+    else:
+        argv = terminal_argv(inner, cwd, title)
     return {
+        "attach": attach,
         "session": sid,
         "title": row.get("title") or sid,
         "cwd": cwd or row.get("cwd"),
@@ -184,13 +214,18 @@ def launch(
     dry: bool = False,
     popen: Callable[..., Any] = subprocess.Popen,
     query: str | None = None,
+    run: Callable[..., Any] = subprocess.run,
 ) -> dict[str, Any]:
     try:
-        if not _has_display() and not dry:
-            raise SpawnError("no graphical session (DISPLAY/WAYLAND_DISPLAY unset)")
-        spec = plan(sid, db, query)
+        tmux = _wants_tmux() and (not dry or bool(shutil.which("tmux")))
+        spec = plan(sid, db, query, tmux=tmux)
         if dry:
             return {"ok": True, "dry": True, **spec}
+        keys = ("session", "title", "cwd", "ended", "cmd", "terminal", "attach")
+        if tmux and _tmux_has(spec["argv"][0], tmux_name(sid), run):
+            if query:
+                raise SpawnError(f"already open in tmux; close it first ({spec['attach']})")
+            return {"ok": True, "existing": True, **{k: spec[k] for k in keys}}
         popen(
             spec["argv"],
             cwd=spec["cwd"] if spec["cwd"] and os.path.isdir(str(spec["cwd"])) else None,
@@ -200,6 +235,6 @@ def launch(
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        return {"ok": True, **{k: spec[k] for k in ("session", "title", "cwd", "ended", "cmd", "terminal")}}
+        return {"ok": True, **{k: spec[k] for k in keys}}
     except SpawnError as e:
         return {"ok": False, "error": str(e)}

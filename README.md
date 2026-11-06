@@ -100,8 +100,10 @@ hermes vibeline web --open --peer gpu-box=http://gpu-box:8877/?token=... --peer 
 
 Sessions and swarms from every reachable machine are merged onto one page, labelled by machine; an unreachable
 one is marked down and the rest keep working. Open, resume and rewind are forwarded, so the terminal opens on
-the machine that owns the session (it needs a graphical session there). Feedback is stored on the machine you
-look at, tagged with the source machine.
+the machine that owns the session. A machine with no graphical session (a server, a GPU box) starts the session
+in a detached tmux session instead and the page shows the command to attach, e.g. `tmux attach -t
+vibeline-<session>`; run it there over SSH. `VIBELINE_TERMINAL=tmux` forces this on a desktop too. Feedback is
+stored on the machine you look at, tagged with the source machine.
 
 - Anything other than loopback requires the token (`--token`, `VIBELINE_TOKEN`, or generated). Loopback clients
   are trusted as before.
@@ -169,7 +171,9 @@ hermes vibeline check [--db PATH]
 
 In the web Sessions page, **open** / **resume** on a lane (or the `t` key) spawns a terminal in that session's cwd.
 Terminal detection tries xdg-terminal-exec, gnome-terminal, kgx, ptyxis, kitty, konsole, wezterm, alacritty, foot,
-xfce4-terminal, xterm in that order. Override with `VIBELINE_TERMINAL=<name>`.
+xfce4-terminal, xterm in that order. Override with `VIBELINE_TERMINAL=<name>`. With no `DISPLAY` or
+`WAYLAND_DISPLAY` (or with `VIBELINE_TERMINAL=tmux`) the session starts in a detached tmux session named
+`vibeline-<session>` and the attach command is printed.
 
 Standalone, without Hermes installed (ledger and web views only):
 

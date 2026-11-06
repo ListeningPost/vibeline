@@ -122,6 +122,39 @@ def test_rewind_validates_then_resubmits_prompt():
     assert _FakeSessionDB.calls == [("s1", 6), ("s1", 6)]
 
 
+def test_headless_machine_uses_tmux():
+    _load()
+    from vibeline import spawn
+
+    db = _db()
+    saved = {k: os.environ.pop(k, None) for k in ("DISPLAY", "WAYLAND_DISPLAY", "VIBELINE_TERMINAL")}
+    seen, has = {}, {"code": 1}
+
+    class _Done:
+        def __init__(self, code):
+            self.returncode = code
+
+    run = lambda argv, **kw: _Done(has["code"])
+    popen = lambda argv, **kw: seen.update(argv=argv)
+    try:
+        with _Patch(spawn.shutil, "which", lambda n: f"/bin/{n}"):
+            out = spawn.launch("s1", db, popen=popen, run=run)
+            assert out["ok"] and out["terminal"] == "tmux" and out["attach"] == "tmux attach -t vibeline-s1"
+            assert seen["argv"][:5] == ["/bin/tmux", "new-session", "-d", "-s", "vibeline-s1"]
+            assert seen["argv"][-3:] == ["/bin/hermes", "--resume", "s1"]
+            seen.clear()
+            has["code"] = 0  # the tmux session is still there: point at it, never start a second one
+            again = spawn.launch("s1", db, popen=popen, run=run)
+            assert again["ok"] and again["existing"] and not seen
+            retry = spawn.launch("s1", db, popen=popen, run=run, query="again")
+            assert retry["ok"] is False and "tmux attach -t vibeline-s1" in retry["error"]
+        with _Patch(spawn.shutil, "which", lambda n: None if n == "tmux" else f"/bin/{n}"):
+            assert "tmux is not installed" in spawn.launch("s1", db, popen=popen, run=run)["error"]
+        assert spawn.tmux_name("20261018_22.28:f2") == "vibeline-20261018_22_28_f2"
+    finally:
+        os.environ.update({k: v for k, v in saved.items() if v is not None})
+
+
 def test_rewind_without_hermes_says_so():
     _load()
     from vibeline import rewind

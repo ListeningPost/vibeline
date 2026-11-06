@@ -91,6 +91,7 @@ def rewind(
         term = spawn.launch(sid, db, query=resend, **kw)
         res["retried"] = bool(resend and term.get("ok"))
         res["terminal"] = term.get("terminal")
+        res["attach"] = term.get("attach")
         if not term.get("ok"):
             res["warning"] = f"rewound, but no terminal opened: {term.get('error')}"
     return res

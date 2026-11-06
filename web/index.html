@@ -618,7 +618,7 @@ window.openTerm=async function(id){
       throw new Error(r.status===501 ? 'restart vibeline web (old process, no /api/spawn)' : `spawn failed (${r.status})`);
     }
     if(!j.ok) throw new Error(j.error||r.statusText);
-    note.textContent=(j.ended?'resumed':'opened')+' · '+(j.terminal||'terminal')+(j.machine?' on '+j.machine:'');
+    note.textContent=(j.existing?'already open':j.ended?'resumed':'opened')+' · '+(j.terminal||'terminal')+(j.machine?' on '+j.machine:'')+(j.attach?' · run there: '+j.attach:'');
     note.className='note ok';
   }catch(e){ note.textContent=String(e.message||e); note.className='note bad'; }
 };
@@ -635,7 +635,7 @@ window.rewindTo=async function(sid,eid,retry,btn){
   try{
     const j=await (await post('api/rewind',{session:sid,event:eid,retry})).json();
     if(!j.ok) throw new Error(j.error||'rewind failed');
-    say(j.warning || `rewound ${j.rewound} messages${j.retried?' · prompt resent':''}${j.machine?' on '+j.machine:''}`, j.warning?'bad':'ok');
+    say(j.warning || `rewound ${j.rewound} messages${j.retried?' · prompt resent':''}${j.machine?' on '+j.machine:''}${j.attach?' · run there: '+j.attach:''}`, j.warning?'bad':'ok');
     await load();
   }catch(e){ say(String(e.message||e),'bad'); btn.disabled=false; }
 };
