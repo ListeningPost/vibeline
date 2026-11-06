@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import shell
+
 MAX_SESSIONS = 8
 LIVE_WINDOW_S = 15 * 60  # an unclosed session with no message for this long is idle, not running
 _TEXT_CAP = 4000
@@ -67,6 +69,14 @@ def _calls(raw: str | None) -> list[dict[str, str]]:
         fn = c.get("function") or {}
         out.append({"id": c.get("id") or c.get("call_id") or "", "name": fn.get("name") or "tool", "args": fn.get("arguments") or ""})
     return out
+
+
+def _arg(raw: str | None, key: str) -> str:
+    try:
+        v = json.loads(raw).get(key) if raw else None
+    except (ValueError, AttributeError):
+        return ""
+    return v if isinstance(v, str) else ""
 
 
 def _event(eid: str, ts: float, kind: str, label: str, title: str, brief: str, context: str, actor: str, **extra: Any) -> dict[str, Any]:
@@ -140,6 +150,9 @@ def _lane_event(m: sqlite3.Row, results: dict, actor: str, _clip: Any, rewind: b
     if not calls:
         return _event(eid, ts, "pass", "REPLY", _first_line(text)[:72] or "Reply", _first_line(text), _clip(text), actor, raw_kind="assistant")
     names = [c["name"] for c in calls]
+    ran = [shell.commands(_arg(c["args"], "command")) if c["name"] in shell.SHELL_TOOLS else [] for c in calls]
+    # A shell step is named after what it ran: `shell: pytest`, not TERMINAL.
+    shown = [("shell: " + ", ".join(r[:3]) + (f" +{len(r) - 3}" if len(r) > 3 else "")) if r else n for n, r in zip(names, ran)]
     parts = [text.strip()] if text.strip() else []
     timing = []
     for c in calls:
@@ -147,12 +160,14 @@ def _lane_event(m: sqlite3.Row, results: dict, actor: str, _clip: Any, rewind: b
         timing.append({"name": c["name"], "ms": _ms(res["timestamp"] - ts) if res else None})
         parts.append(f"▸ {c['name']}  {_clip(c['args'], 1500)}" + (f"\n→ {_clip(res['content'], 1500)}" if res else "\n→ (running)"))
     uniq = list(dict.fromkeys(names))
+    titles = list(dict.fromkeys(shown))
+    cmd = ran[0][0].split()[0] if ran[0] else None
     return _event(
         eid,
         ts,
         "spawn" if "delegate_task" in names else "note",
-        uniq[0].upper()[:9],
-        ", ".join(uniq) + (f" ({len(calls)} calls)" if len(calls) > 1 else ""),
+        f"shell: {cmd}"[:24] if cmd else uniq[0].upper()[:9],
+        ", ".join(titles) + (f" ({len(calls)} calls)" if len(calls) > 1 else ""),
         _first_line(text) or _first_line(calls[0]["args"]),
         "\n\n".join(parts),
         actor,
@@ -160,6 +175,8 @@ def _lane_event(m: sqlite3.Row, results: dict, actor: str, _clip: Any, rewind: b
         quiet=True,
         n=len(calls),
         tools=uniq,
+        cmd=cmd,
+        cmds=list(dict.fromkeys(c for r in ran for c in r)),
         calls=timing,
         dur_ms=None if any(t["ms"] is None for t in timing) else max(t["ms"] for t in timing),
     )

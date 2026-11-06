@@ -410,3 +410,38 @@ def test_hub_merges_peers_and_forwards_actions():
         raise AssertionError("duplicate name accepted")
     except ValueError:
         pass
+
+
+def test_shell_steps_are_named_after_the_command():
+    _load()
+    from vibeline import sessions, shell
+
+    for script, want in [
+        ("ls -la", ["ls"]),
+        ("cd /x && . .venv/bin/activate && pytest -q 2>&1 | tail -25", ["pytest"]),
+        ("sudo -n timeout 30 curl -s http://x | jq .", ["curl"]),
+        ("FOO=1 python3 -m pytest -x", ["pytest"]),
+        ("bash -lc 'cd a && npm run build'", ["npm run"]),
+        ("for p in a b; do\n  ls $p\ndone", ["ls"]),
+        ("python3 - <<'PY'\nimport os\nrm = 3\nPY\necho done", ["python3"]),
+        ("npx --yes tsc --noEmit", ["tsc"]),
+        ("git status -sb && git log --oneline; docker compose ps", ["git status", "git log", "docker compose"]),
+        ("echo hi; sleep 1", ["echo", "sleep"]),  # nothing but plumbing: name it anyway
+        ("./scripts/run.sh --fast &", ["run.sh"]),
+        ("echo 'a && rm -rf b'", ["echo"]),
+        ("", []),
+        ("'unterminated", []),
+    ]:
+        assert shell.commands(script) == want, (script, shell.commands(script))
+
+    db = _db()
+    cx = sqlite3.connect(db)
+    calls = lambda *cmds: json.dumps([{"id": f"c{i}", "function": {"name": "terminal", "arguments": json.dumps({"command": c})}} for i, c in enumerate(cmds)])
+    cx.execute("INSERT INTO messages (session_id, role, content, tool_calls, timestamp) VALUES ('s1','assistant','',?,?)", (calls("cd /srv && git status -sb && make test", "ls"), 5000.0))
+    cx.execute("INSERT INTO messages (session_id, role, content, tool_calls, timestamp) VALUES ('s1','assistant','',?,?)", (json.dumps([{"id": "z", "function": {"name": "terminal", "arguments": "{broken"}}]), 5001.0))
+    cx.commit(); cx.close()
+    ev = [e for p in sessions.sessions_data(db)["parents"] if p["id"] == "s1" for e in p["events"] if e["t"] >= sessions._iso(5000.0)]
+    git, broken = ev[0], ev[1]
+    assert git["label"] == "shell: git" and git["cmd"] == "git" and git["cmds"] == ["git status", "make", "ls"]
+    assert git["title"] == "shell: git status, make, shell: ls (2 calls)" and git["tools"] == ["terminal"]
+    assert broken["label"] == "TERMINAL" and broken["cmd"] is None  # unreadable arguments keep the tool name
