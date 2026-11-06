@@ -60,10 +60,10 @@ def register(ctx):
     )
     ctx.register_cli_command(
         name="vibeline",
-        help="Markdown rails for the agent-harness ledger",
+        help="Rails for Hermes sessions, swarms and the harness ledger",
         setup_fn=setup_argparse,
         handler_fn=cli_run,
-        description="hermes vibeline rails | dashboard | tasks | web | open | check",
+        description="hermes vibeline rails | dashboard | tasks | web | open | rewind | feedback | check",
     )
     skills_dir = Path(__file__).parent / "skills"
     if skills_dir.is_dir():

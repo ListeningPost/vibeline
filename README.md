@@ -61,6 +61,13 @@ step. `auto` compares a tool with its own median on screen (slow = 3x typical an
 threshold (1s to 5m) instead if you prefer, and tick *slow only* to hide the rest. `?heat=1` opens a link in
 this mode.
 
+In the session list, timed steps get a coloured card with their duration, slowest first, wherever one fits
+over its own dot. The rest stay dots until you zoom in.
+
+**Zoom and pan.** Hold Ctrl (or ⌘) and turn the wheel, or pinch on a trackpad, to stretch the time axis around
+the cursor; text and cards keep their size. `+` and `-` zoom, `0` resets, double-clicking an empty rail fits
+everything, and the footer has the same controls. Hold the middle mouse button and drag to pan the timelines.
+
 **Shell steps.** A terminal tool call is labelled with the program it ran, `shell: pytest` or `shell: git`,
 read from the command line: `cd`, `echo`, `sudo`, `timeout`, pipes and `bash -c` wrappers are looked through,
 and `npx tsc` or `python -m pytest` name the tool they run. The step title lists everything the script ran.

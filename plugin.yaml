@@ -1,6 +1,6 @@
 name: vibeline
 version: 0.2.0
-description: "Render agent-harness rails as markdown in the Hermes CLI session. /rails and hermes vibeline."
+description: "Show agent work as rails in the TUI, web and CLI. One lane per agent, tool calls and results as marks. /rails and hermes vibeline."
 author: ListeningPost
 license: MIT
 manifest_version: 2
