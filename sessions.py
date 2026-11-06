@@ -94,53 +94,75 @@ def _event(eid: str, ts: float, kind: str, label: str, title: str, brief: str, c
     }
 
 
-def _lane_events(s: sqlite3.Row, msgs: list[sqlite3.Row], actor: str) -> list[dict[str, Any]]:
+def _ms(seconds: float) -> int:
+    return max(0, int(round(seconds * 1000)))
+
+
+def _lane_events(
+    s: sqlite3.Row, msgs: list[sqlite3.Row], actor: str, *, clip: Any = None, rewind: bool = False
+) -> list[dict[str, Any]]:
+    """One event per visible message. Timing comes from the message clock:
+
+    wait_ms  time since the previous message in the session (for a model step: how long the model took)
+    dur_ms   for a tool step: assistant message -> last tool result (None while a call is still running)
+    """
+    _clip = clip or globals()["_clip"]
     results = {m["tool_call_id"]: m for m in msgs if m["role"] == "tool" and m["tool_call_id"]}
     events: list[dict[str, Any]] = []
+    prev_ts: float | None = None
     for m in msgs:
-        role, text, kind_tag = m["role"], m["content"] or "", m["display_kind"]
-        eid = f"m{m['id']}"
-        if role == "tool" or kind_tag == "hidden":
+        since, prev_ts = (None if prev_ts is None else _ms(m["timestamp"] - prev_ts)), m["timestamp"]
+        if m["role"] == "tool" or m["display_kind"] == "hidden":
             continue
-        if role == "user":
-            if kind_tag in ("async_delegation_complete", "process_complete"):
-                events.append(_event(eid, m["timestamp"], "note", "RETURN", "Background work returned", _first_line(text), _clip(text), actor, raw_kind=kind_tag, quiet=True))
-            else:
-                label = "STEER" if kind_tag == "steer" else "PROMPT"
-                events.append(_event(eid, m["timestamp"], "open", label, _first_line(text)[:72] or label, _first_line(text), _clip(text), actor, raw_kind="user"))
-            continue
-        if kind_tag == "failed_turn":
-            events.append(_event(eid, m["timestamp"], "fail", "FAIL", "Turn failed", _first_line(text), _clip(text), actor, raw_kind=kind_tag))
-            continue
-        calls = _calls(m["tool_calls"])
-        if not calls:
-            events.append(_event(eid, m["timestamp"], "pass", "REPLY", _first_line(text)[:72] or "Reply", _first_line(text), _clip(text), actor, raw_kind="assistant"))
-            continue
-        names = [c["name"] for c in calls]
-        parts = [text.strip()] if text.strip() else []
-        for c in calls:
-            res = results.get(c["id"])
-            parts.append(f"▸ {c['name']}  {_clip(c['args'], 1500)}" + (f"\n→ {_clip(res['content'], 1500)}" if res else "\n→ (running)"))
-        uniq = list(dict.fromkeys(names))
-        events.append(
-            _event(
-                eid,
-                m["timestamp"],
-                "spawn" if "delegate_task" in names else "note",
-                uniq[0].upper()[:9],
-                ", ".join(uniq) + (f" ({len(calls)} calls)" if len(calls) > 1 else ""),
-                _first_line(text) or _first_line(calls[0]["args"]),
-                "\n\n".join(parts),
-                actor,
-                raw_kind="tool_call",
-                quiet=True,
-                n=len(calls),
-            )
-        )
+        ghost = not m["active"]
+        e = _lane_event(m, results, actor, _clip, rewind and not ghost)
+        e["ghost"] = ghost
+        if m["role"] != "user":
+            e["wait_ms"] = since
+        events.append(e)
     if s["ended_at"]:
         reason = s["end_reason"] or "closed"
         events.append(_event(f"end-{s['id']}", s["ended_at"], "done", "END", f"Session ended · {reason}", reason, reason, actor, raw_kind="end"))
     return events
+
+
+def _lane_event(m: sqlite3.Row, results: dict, actor: str, _clip: Any, rewind: bool) -> dict[str, Any]:
+    text, kind_tag, ts = m["content"] or "", m["display_kind"], m["timestamp"]
+    eid = f"m{m['id']}"
+    if m["role"] == "user":
+        if kind_tag in ("async_delegation_complete", "process_complete"):
+            return _event(eid, ts, "note", "RETURN", "Background work returned", _first_line(text), _clip(text), actor, raw_kind=kind_tag, quiet=True)
+        label = "STEER" if kind_tag == "steer" else "PROMPT"
+        return _event(eid, ts, "open", label, _first_line(text)[:72] or label, _first_line(text), _clip(text), actor, raw_kind="user", can_rewind=rewind)
+    if kind_tag == "failed_turn":
+        return _event(eid, ts, "fail", "FAIL", "Turn failed", _first_line(text), _clip(text), actor, raw_kind=kind_tag)
+    calls = _calls(m["tool_calls"])
+    if not calls:
+        return _event(eid, ts, "pass", "REPLY", _first_line(text)[:72] or "Reply", _first_line(text), _clip(text), actor, raw_kind="assistant")
+    names = [c["name"] for c in calls]
+    parts = [text.strip()] if text.strip() else []
+    timing = []
+    for c in calls:
+        res = results.get(c["id"])
+        timing.append({"name": c["name"], "ms": _ms(res["timestamp"] - ts) if res else None})
+        parts.append(f"▸ {c['name']}  {_clip(c['args'], 1500)}" + (f"\n→ {_clip(res['content'], 1500)}" if res else "\n→ (running)"))
+    uniq = list(dict.fromkeys(names))
+    return _event(
+        eid,
+        ts,
+        "spawn" if "delegate_task" in names else "note",
+        uniq[0].upper()[:9],
+        ", ".join(uniq) + (f" ({len(calls)} calls)" if len(calls) > 1 else ""),
+        _first_line(text) or _first_line(calls[0]["args"]),
+        "\n\n".join(parts),
+        actor,
+        raw_kind="tool_call",
+        quiet=True,
+        n=len(calls),
+        tools=uniq,
+        calls=timing,
+        dur_ms=None if any(t["ms"] is None for t in timing) else max(t["ms"] for t in timing),
+    )
 
 
 def _status(s: sqlite3.Row, msgs: list[sqlite3.Row], now: float) -> str:
@@ -168,10 +190,16 @@ def _meta(s: sqlite3.Row) -> list[list[str]]:
     return [[k, str(v)] for k, v in rows if v]
 
 
-def sessions_data(db: Path, limit: int = MAX_SESSIONS, only: str | None = None) -> dict[str, Any]:
-    """The most recently active sessions, or just `only` when a session id is given."""
+def sessions_data(db: Path, limit: int = MAX_SESSIONS, only: str | None = None, full: bool = False) -> dict[str, Any]:
+    """The most recently active sessions, or just `only` when a session id is given.
+
+    `full` keeps message text unclipped (feedback export)."""
     now = time.time()
+    clip = (lambda text, cap=0: text or "") if full else _clip
     with _connect(db) as cx:
+        # Rewound messages stay in state.db with active=0; older Hermes has no such column.
+        has_active = any(r[1] == "active" for r in cx.execute("PRAGMA table_info(messages)"))
+        active = "active" if has_active else "1 AS active"
         tops = cx.execute("SELECT * FROM sessions WHERE id=?", (only,)).fetchall() if only else cx.execute(
             """SELECT s.*, COALESCE((SELECT MAX(timestamp) FROM messages m WHERE m.session_id = s.id), s.started_at) AS last_t
                FROM sessions s WHERE s.source != 'subagent' ORDER BY last_t DESC LIMIT ?""",
@@ -180,7 +208,7 @@ def sessions_data(db: Path, limit: int = MAX_SESSIONS, only: str | None = None) 
 
         def messages(sid: str) -> list[sqlite3.Row]:
             return cx.execute(
-                "SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, display_kind FROM messages WHERE session_id=? ORDER BY id",
+                f"SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, display_kind, {active} FROM messages WHERE session_id=? ORDER BY id",
                 (sid,),
             ).fetchall()
 
@@ -188,7 +216,7 @@ def sessions_data(db: Path, limit: int = MAX_SESSIONS, only: str | None = None) 
         for s in tops:
             msgs = messages(s["id"])
             actor = f"{s['source']} · {s['model'] or 'model unknown'}"
-            events = _lane_events(s, msgs, actor)
+            events = _lane_events(s, msgs, actor, clip=clip, rewind=True)
             kids = cx.execute(
                 "SELECT * FROM sessions WHERE parent_session_id=? AND source='subagent' ORDER BY started_at", (s["id"],)
             ).fetchall()
@@ -198,10 +226,10 @@ def sessions_data(db: Path, limit: int = MAX_SESSIONS, only: str | None = None) 
                 kmsgs = messages(k["id"])
                 goal = next((m["content"] for m in kmsgs if m["role"] == "user"), "") or ""
                 kactor = f"subagent · {k['model'] or 'model unknown'}"
-                kev = _lane_events(k, kmsgs, kactor)
-                kev.insert(0, _event(f"spawned-{k['id']}", k["started_at"], "spawn", "SPAWNED", f"Subagent {i} spawned", _first_line(goal), _clip(goal), kactor, raw_kind="spawn"))
+                kev = _lane_events(k, kmsgs, kactor, clip=clip)
+                kev.insert(0, _event(f"spawned-{k['id']}", k["started_at"], "spawn", "SPAWNED", f"Subagent {i} spawned", _first_line(goal), clip(goal), kactor, raw_kind="spawn"))
                 kev = [e for e in kev if not (e["label"] == "PROMPT" and e["context"] == kev[0]["context"])]
-                events.append(_event(f"sp-{k['id']}", k["started_at"], "spawn", "SPAWN", f"Spawned subagent {i}", _first_line(goal), _clip(goal), actor, raw_kind="spawn", child=k["id"]))
+                events.append(_event(f"sp-{k['id']}", k["started_at"], "spawn", "SPAWN", f"Spawned subagent {i}", _first_line(goal), clip(goal), actor, raw_kind="spawn", child=k["id"]))
                 kin, kout = _tokens(k)
                 tin, tout = tin + kin, tout + kout
                 subs.append(

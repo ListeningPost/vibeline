@@ -187,13 +187,70 @@ body.focus .group{border-bottom:0}
 .ev.quiet .dot{background:currentColor;border-width:0;width:7px;height:7px;left:-3.5px;top:-3.5px;opacity:.75}
 .ev.quiet.k-spawn .dot{border-width:2.5px;background:var(--bg);width:9px;height:9px;left:-4.5px;top:-4.5px;opacity:1}
 .ev.quiet.on .dot,.ev.quiet:hover .dot{opacity:1;box-shadow:0 0 0 3px var(--bg),0 0 0 4.5px currentColor}
+/* nav, tools */
+.nav{margin-left:0;display:flex;gap:2px}
+.nav a{margin:0;padding:3px 8px;border-radius:6px}
+.nav a.on{background:#161b22}
+.tool{font:12px var(--sans);color:var(--mut);background:transparent;border:1px solid var(--line);border-radius:6px;padding:4px 9px;cursor:pointer;white-space:nowrap}
+.tool:hover{color:var(--ink);border-color:var(--mut)}
+.tool.on{color:var(--ink);border-color:var(--ink);background:#161b22}
+.ctl{display:none;align-items:center;gap:6px;font:11px var(--mono);color:var(--mut)}
+.ctl select{font:11px var(--mono);color:var(--ink);background:#161b22;border:1px solid var(--line);border-radius:5px;padding:3px 4px}
+.ctl a{color:var(--ink)}
+body.heat .ctl.heatctl,body.fbmode.canfb .ctl.fbctl{display:flex}
+body:not(.canfb) #fb{display:none}
+.chip{font:9px/1 var(--mono);letter-spacing:.06em;padding:2px 5px;border-radius:4px;border:1px solid var(--line);color:var(--ink);text-transform:none}
+.chip.down{color:var(--bad);border-color:var(--bad)}
+/* stopwatch heatmap: blue fast, yellow typical, red slow */
+:root{--cold:#58a6ff;--mid:#e3b341;--hot:#ff4d4d}
+.heat .ev{opacity:.22}
+.heat .ev.h-cold,.heat .ev.h-mid,.heat .ev.h-hot{opacity:1}
+.heat .ev.h-cold,.heat .ev.h-cold .card,.heat .ev.h-cold .card b{color:var(--cold)}
+.heat .ev.h-mid,.heat .ev.h-mid .card,.heat .ev.h-mid .card b{color:var(--mid)}
+.heat .ev.h-hot,.heat .ev.h-hot .card,.heat .ev.h-hot .card b{color:var(--hot)}
+.heat .ev.h-cold .dot,.heat .ev.h-mid .dot,.heat .ev.h-hot .dot{background:currentColor;opacity:1}
+.heat .ev.h-hot{z-index:5}
+.heat .ev.h-hot .dot{outline:2px solid var(--hot);outline-offset:2px;box-shadow:0 0 12px 4px rgba(255,77,77,.8)}
+.heat .ev.h-hot .card{border-color:var(--hot);box-shadow:0 0 10px rgba(255,77,77,.55)}
+.heat.slowonly .ev:not(.h-hot){opacity:.1}
+.sw{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 4px 0 10px;vertical-align:middle}
+/* rewound steps stay visible as ghosts */
+.ev.ghost{opacity:.3}
+.ev.ghost .dot{border-style:dashed}
+.log li.ghost{opacity:.45;text-decoration:line-through}
+/* feedback */
+.fbmode .ev.r-up::after,.fbmode .ev.r-mid::after,.fbmode .ev.r-down::after{content:"";position:absolute;left:-3px;top:9px;width:6px;height:6px;border-radius:50%}
+.fbmode .ev.r-up::after{background:var(--ok)} .fbmode .ev.r-mid::after{background:var(--mut)} .fbmode .ev.r-down::after{background:var(--bad)}
+.fbmode .ev.t-bad::before{content:"!";position:absolute;left:5px;top:6px;font:700 10px/1 var(--mono);color:var(--bad)}
+.fb{margin:14px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#0f1319}
+.fb h3{margin:0 0 8px}
+.rate{display:flex;gap:6px}
+.rate button{flex:1;font:12px var(--sans);color:var(--mut);background:#161b22;border:1px solid var(--line);border-radius:6px;padding:7px 4px;cursor:pointer}
+.rate button:hover{color:var(--ink)}
+.rate button.on.up{color:var(--ok);border-color:var(--ok)} .rate button.on.mid{color:var(--ink);border-color:var(--mut)} .rate button.on.down{color:var(--bad);border-color:var(--bad)}
+.fb textarea,.fb input[type=text]{width:100%;margin-top:8px;font:12px var(--sans);color:var(--ink);background:#0d1117;border:1px solid var(--line);border-radius:6px;padding:7px}
+.fb textarea{min-height:64px;resize:vertical}
+.fb label{display:flex;gap:6px;align-items:center;margin-top:10px;font-size:12px}
+.fb .save{margin-top:6px;font:11px var(--mono);color:var(--ink);background:#161b22;border:1px solid var(--line);border-radius:6px;padding:5px 9px;cursor:pointer}
+.go.warn{border-color:#5a3a1a;color:var(--mid)}
+.go.armed{border-color:var(--hot);color:var(--hot)}
+.small{font-size:11px;margin:6px 0 0}
 </style></head><body>
 <header>
   <h1>Vibeline</h1>
-  <button class="back" id="back" title="Esc">← All sessions</button>
+  <nav class="nav" id="nav"><a data-src="sessions">Sessions</a><a data-src="swarm">Swarm</a><a data-src="ledger">Ledger</a></nav>
+  <button class="back" id="back" title="Esc">← All</button>
   <button class="gohdr" id="open" title="t">Open terminal</button>
   <p class="lede" id="lede"></p>
   <span class="note" id="note"></span>
+  <button class="tool" id="heat" title="Stopwatch: colour steps by how long they took (h)">⏱ Stopwatch</button>
+  <span class="ctl heatctl">
+    <select id="hmetric" title="What to time"><option value="tool">tool time</option><option value="wait">model wait</option></select>
+    <select id="hthr" title="Slow threshold"><option value="auto">auto: vs. typical</option><option value="1">slow ≥ 1s</option><option value="5">slow ≥ 5s</option><option value="10">slow ≥ 10s</option><option value="30">slow ≥ 30s</option><option value="60">slow ≥ 1m</option><option value="300">slow ≥ 5m</option></select>
+    <label><input type="checkbox" id="honly"> slow only</label>
+  </span>
+  <button class="tool" id="fb" title="Feedback mode: rate steps and export for fine-tuning (f)">👍 Feedback</button>
+  <span class="ctl fbctl"><span id="fbn"></span> export <a id="fbcsv" download>CSV</a> <a id="fbjsonl" download>JSONL</a></span>
   <div class="live" id="live"><i></i><span>live</span></div>
 </header>
 <div class="wrap">
@@ -203,12 +260,21 @@ body.focus .group{border-bottom:0}
 <footer class="bar" id="bar"></footer>
 <script>
 // ?src=ledger shows the harness ledger; default is live Hermes sessions.
-const SRCQ='src='+encodeURIComponent(new URLSearchParams(location.search).get('src')||'sessions');
+const Q0=new URLSearchParams(location.search);
+const SRC=Q0.get('src')||'sessions', TOKEN=Q0.get('token')||'';
+const SRCQ='src='+encodeURIComponent(SRC);
+// A node reached over the network needs its token on every request; keep it in page links too.
+const api=(path,opts={})=>fetch(path,{...opts,headers:{...(opts.headers||{}),...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}});
+const post=(path,body)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+const pageURL=o=>{ const q=new URLSearchParams(), src=o.src||SRC; if(src!=='sessions') q.set('src',src); if(o.session) q.set('session',o.session); if(TOKEN) q.set('token',TOKEN); const t=q.toString(); return location.pathname+(t?'?'+t:''); };
+const store={ get(k,d){ try{ const v=localStorage.getItem('vibeline.'+k); return v==null?d:JSON.parse(v); }catch{ return d; } }, set(k,v){ try{ localStorage.setItem('vibeline.'+k,JSON.stringify(v)); }catch{} } };
+document.querySelectorAll('#nav a').forEach(a=>{ a.href=pageURL({src:a.dataset.src}); a.classList.toggle('on',a.dataset.src===SRC); });
 let DATA = null;
-let FOCUS = new URLSearchParams(location.search).get('session');
+let FOCUS = Q0.get('session');
 function chrome(){
   document.body.classList.toggle('focus', !!FOCUS);
-  document.body.classList.toggle('sessions', !!(DATA && DATA.src==='sessions'));
+  document.body.classList.toggle('sessions', !!(DATA && DATA.can && DATA.can.open));
+  document.body.classList.toggle('canfb', !!(DATA && DATA.can && DATA.can.feedback));
   document.getElementById('lede').textContent = (FOCUS && DATA && DATA.parents[0]) ? DATA.parents[0].name : '';
   const o=document.getElementById('open');
   if(FOCUS && DATA && DATA.parents[0]) o.textContent = DATA.parents[0].status==='complete' ? 'Resume in terminal' : 'Open terminal';
@@ -217,7 +283,7 @@ chrome();
 /* open one session on its own, or go back to the list */
 function focusOn(id, push=true){
   FOCUS=id; DATA=null; chrome();
-  if(push) history.pushState(null,'',id?'?session='+encodeURIComponent(id):location.pathname);
+  if(push) history.pushState(null,'',pageURL({session:id}));
   load();
 }
 const NAMEW = 268;
@@ -233,8 +299,62 @@ const stat = s => s==='in_progress' ? 'running' : s;
 const inner = document.getElementById('inner');
 // In the list, tool calls are dots. With one session in focus every step gets a card, as in the ledger view.
 const isQuiet = e => e.child || (e.quiet && !FOCUS);
-const lanesOf = p => [{id:p.id, name:p.agent, status:p.status, events:p.events, tokens:p.lane_tokens, meta:p.meta}, ...p.subs.map(s=>({id:s.id, name:s.name, status:s.status, events:s.events, tokens:s.tokens, meta:s.meta}))];
-const canOpen = () => DATA && DATA.src === 'sessions';
+const lanesOf = p => p._lanes ??= [{id:p.id, name:p.agent, status:p.status, events:p.events, tokens:p.lane_tokens, meta:p.meta}, ...p.subs.map(s=>({id:s.id, name:s.name, status:s.status, events:s.events, tokens:s.tokens, meta:s.meta}))];
+const canOpen = () => !!(DATA && DATA.can && DATA.can.open);
+const sec = v => v<1000 ? Math.round(v)+'ms' : v<60000 ? (v/1000).toFixed(1)+'s' : dur(v);
+const multi = () => !!(DATA && DATA.machines && DATA.machines.length>1);
+
+/* ---------- stopwatch heatmap ---------- */
+const HEAT = Object.assign({on:false, metric:'tool', thr:'auto', only:false}, store.get('heat',{}));
+if(Q0.has('heat')) HEAT.on = Q0.get('heat')!=='0';   // ?heat=1 / ?fb=1 open a link straight into a mode
+const heatVal = (e,metric=HEAT.metric) => e.ghost ? null : metric==='tool' ? e.dur_ms : (e.raw_kind==='user' ? null : e.wait_ms);
+const median = a => { const b=[...a].sort((x,y)=>x-y), n=b.length; return n ? (n%2 ? b[(n-1)/2] : (b[n/2-1]+b[n/2])/2) : null; };
+let MED = {tool:{by:{},all:null}, wait:{by:{},all:null}};
+function heatStats(){
+  for(const metric of ['tool','wait']){
+    const by={}, all=[];
+    DATA.parents.forEach(p=>lanesOf(p).forEach(l=>l.events.forEach(e=>{ const v=heatVal(e,metric); if(v==null) return; (by[e.label]??=[]).push(v); all.push(v); })));
+    // Compare a tool with its own history once there is enough of it, otherwise with everything on screen.
+    MED[metric]={by:Object.fromEntries(Object.entries(by).filter(([,a])=>a.length>=4).map(([k,a])=>[k,median(a)])), all:median(all)};
+  }
+}
+const typical = (e,metric=HEAT.metric) => metric==='tool' ? (MED.tool.by[e.label] ?? MED.tool.all) : MED.wait.all;
+function heatOf(e){
+  const v=heatVal(e); if(v==null) return null;
+  if(HEAT.thr!=='auto'){ const T=+HEAT.thr*1000; return v>=T ? 'hot' : v<T/4 ? 'cold' : 'mid'; }
+  const base=Math.max(typical(e) ?? v, 250);
+  return v>=Math.max(base*3,2000) ? 'hot' : v<=base/2 ? 'cold' : 'mid';   // slow = 3x typical and at least 2s
+}
+
+/* ---------- feedback ---------- */
+let FB = {ratings:{}, tools:{}};
+let FBMODE = Q0.has('fb') ? Q0.get('fb')!=='0' : !!store.get('fbmode',false);
+const RCLS = {'1':'up','0':'mid','-1':'down'};
+
+/* heat + feedback are classes on the marks, so toggling them never rebuilds the rails */
+function decorate(){
+  document.body.classList.toggle('heat',HEAT.on);
+  document.body.classList.toggle('slowonly',HEAT.on&&HEAT.only);
+  document.body.classList.toggle('fbmode',FBMODE);
+  document.getElementById('heat').classList.toggle('on',HEAT.on);
+  document.getElementById('fb').classList.toggle('on',FBMODE);
+  document.getElementById('hmetric').value=HEAT.metric; document.getElementById('hthr').value=HEAT.thr; document.getElementById('honly').checked=HEAT.only;
+  const n=Object.keys(FB.ratings).length, q=TOKEN?'?token='+encodeURIComponent(TOKEN):'';
+  document.getElementById('fbn').textContent=`${n} rated ·`;
+  document.getElementById('fbcsv').href='api/feedback.csv'+q; document.getElementById('fbjsonl').href='api/feedback.jsonl'+q;
+  if(!DATA || DATA.error) return;
+  document.querySelectorAll('.ev').forEach(el=>{
+    const hit=find(el.dataset.id); if(!hit) return; const e=hit.e;
+    const h=HEAT.on ? heatOf(e) : null, r=FB.ratings[e.id];
+    for(const c of ['hot','mid','cold']) el.classList.toggle('h-'+c, h===c);
+    for(const c of ['up','mid','down']) el.classList.toggle('r-'+c, !!r && RCLS[r.rating]===c);
+    el.classList.toggle('t-bad',(e.tools||[]).some(t=>t in FB.tools));
+    const small=el.querySelector('.card small'), v=heatVal(e);
+    if(small) small.textContent = HEAT.on && v!=null ? sec(v) : fmt(e.t);
+    if(el.classList.contains('quiet')) el.title = e.title + (v!=null ? ' · '+sec(v) : '');
+  });
+  if(DATA.parents.length) bar();
+}
 const termBtn = (id, status) => canOpen()
   ? `<button class="term" data-sid="${esc(id)}" title="${status==='complete'?'Resume':'Open'} hermes in this session">${status==='complete'?'resume':'open'}</button>`
   : '';
@@ -272,14 +392,44 @@ function find(id){
   return null;
 }
 const lab = e => e.child ? `SPAWN ${e.child}` : e.label;
-function paint(hit){
+let PANEL=null;
+function fbHTML(d){
+  if(!(FBMODE && DATA.can && DATA.can.feedback)) return '';
+  const r=FB.ratings[d.id]||{}, id=esc(d.id);
+  const b=(v,cls,txt)=>`<button class="${cls}${r.rating===v?' on':''}" onclick="rate('${id}',${v})">${txt}</button>`;
+  const tools=(d.tools||[]).map(t=>{ const bad=t in FB.tools;
+    return `<label><input type="checkbox" ${bad?'checked':''} onchange="flagTool('${esc(t)}',this.checked,'${id}')"> <span><b>${esc(t)}</b> is performing poorly (every call)</span></label>
+      ${bad?`<input type="text" placeholder="What is wrong with ${esc(t)}?" value="${esc(FB.tools[t])}" onchange="flagTool('${esc(t)}',true,'${id}',this.value)">`:''}`; }).join('');
+  return `<div class="fb"><h3>Feedback</h3>
+    <div class="rate">${b(1,'up','👍 good')}${b(0,'mid','😐 neutral')}${b(-1,'down','👎 bad')}</div>
+    <textarea id="fbnote" placeholder="Why? Exported with the rating.">${esc(r.note||'')}</textarea>
+    <button class="save" onclick="rate('${id}',undefined)">Save note</button>${tools}</div>`;
+}
+function rewindHTML(p,l,i){
+  if(!(DATA.can && DATA.can.rewind) || l.id!==p.id) return '';
+  let k=i; while(k>=0 && !l.events[k].can_rewind) k--;
+  if(k<0) return '';
+  const tg=l.events[k], drops=l.events.slice(k).filter(e=>!e.ghost && /(^|~)m\d+$/.test(e.id)).length, a=`'${esc(l.id)}','${esc(tg.id)}'`;
+  return `<button class="go warn" data-n="${drops}" onclick="rewindTo(${a},true,this)">⟲ Rewind to ${k===i?'this prompt':'the prompt before this'} and retry</button>
+    <button class="go" data-n="${drops}" onclick="rewindTo(${a},false,this)">⟲ Rewind and open without resending</button>
+    <p class="dim small">Drops “${esc(tg.title)}” and everything after it (${drops} steps) from the session${p.machine&&multi()?' on '+esc(p.machine):''}. They stay here as ghosts. Files the agent changed are not restored. Close any terminal still attached to this session first.</p>`;
+}
+function paint(hit, force){
   const {p,l,i,e:d}=hit, lane=l.events, prev=lane[i-1], next=lane[i+1];
+  const ae=document.activeElement;   // a live refresh must not eat a half-typed note
+  if(!force && PANEL===d.id && ae && ae.closest && ae.closest('.fb')) return;
+  PANEL=d.id;
+  const typ=d.dur_ms!=null && typical(d,'tool')!=null ? ` <span class="dim">· typical ${esc(d.label)} ${sec(typical(d,'tool'))}</span>` : '';
+  const calls=(d.calls||[]).length>1 ? d.calls.map(c=>`${esc(c.name)} ${c.ms==null?'running':sec(c.ms)}`).join(' · ') : '';
+  const timing=`${d.dur_ms!=null?`<dt>tool time</dt><dd>${sec(d.dur_ms)}${typ}</dd>`:''}${calls?`<dt>calls</dt><dd>${calls}</dd>`:''}
+      ${d.wait_ms!=null&&d.raw_kind!=='user'?`<dt>model wait</dt><dd>${sec(d.wait_ms)} <span class="dim">before this step</span></dd>`:''}
+      ${d.ghost?'<dt>state</dt><dd>rewound · no longer in the session</dd>':''}${multi()&&p.machine?`<dt>machine</dt><dd>${esc(p.machine)}</dd>`:''}`;
   const link=(e,txt)=>`<a href="#${e.id}" onclick="select('${e.id}');return false">${txt}</a>`;
   const nav=`<p class="lanenav">${prev?link(prev,`← ${esc(lab(prev))} ${fmt(prev.t)}`):'<span></span>'}
     ${next?link(next,`${esc(lab(next))} ${fmt(next.t)} →`):'<span class="dim">end of lane</span>'}</p>`;
   const t0=ms(lane[0].t), t1=ms(lane[lane.length-1].t), ltok=l.tokens ?? lane.reduce((n,e)=>n+(e.tokens||0),0);
   const meta=(l.meta||[]).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
-  const log=lane.map(e=>`<li class="${e.id===d.id?'on':''}" onclick="select('${e.id}')"><time>${fmt(e.t).replace(/ [AP]M$/,'')}</time><b class="k-${e.kind}">${esc(e.label)}</b><span>${esc(e.child?e.title:e.brief)}</span></li>`).join('');
+  const log=lane.map(e=>`<li class="${e.id===d.id?'on':''}${e.ghost?' ghost':''}" onclick="select('${e.id}')"><time>${fmt(e.t).replace(/ [AP]M$/,'')}</time><b class="k-${e.kind}">${esc(e.label)}</b><span>${esc(e.child?e.title:e.brief)}</span></li>`).join('');
   const since=prev?` · +${dur(ms(d.t)-ms(prev.t))} after ${esc(lab(prev))}`:'';
   document.getElementById('panel').innerHTML=`
     <p class="kicker k-${d.kind}"><b>${esc(d.label)}</b> <span class="dim">· ${fmt(d.t)} · +${dur(ms(d.t)-ms(p.events[0].t))} into run${since}</span></p>
@@ -289,10 +439,13 @@ function paint(hit){
       <dt>agent</dt><dd>${esc(d.actor)}</dd>
       <dt>kind</dt><dd>${esc(d.raw_kind)}${d.result?' · '+esc(d.result):''}${d.ac_id?' · '+esc(d.ac_id):''}${d.n>1?' · '+d.n+' calls':''}</dd>
       <dt>iso</dt><dd>${esc(d.t)}</dd>
+      ${timing}
       ${meta}
     </dl>
     ${nav}
+    ${fbHTML(d)}
     ${canOpen() && l.id ? `<button class="go" onclick="openTerm('${esc(l.id)}')">${l.status==='complete'?'Resume':'Open'} terminal · ${esc(l.id)}</button>` : ''}
+    ${rewindHTML(p,l,i)}
     <h3>${d.raw_kind==='tool_call'?'Calls and results':'Content'}</h3>
     <pre>${esc(d.context)||'<span class="dim">nothing recorded</span>'}</pre>
     <h3>Lane · ${esc(l.name)}</h3>
@@ -317,14 +470,14 @@ function layoutCards(events){
   });
 }
 function evHTML(e,x,cx,tier){
-  if(isQuiet(e)) return `<div class="ev k-${e.kind} quiet" data-id="${e.id}" style="left:${x}px" title="${esc(e.title)}"><span class="dot kind-${e.kind}"></span></div>`;
+  if(isQuiet(e)) return `<div class="ev k-${e.kind} quiet${e.ghost?' ghost':''}" data-id="${e.id}" style="left:${x}px" title="${esc(e.title)}"><span class="dot kind-${e.kind}"></span></div>`;
   const h = tier==='t1' ? 11 : 44;
   const dx = cx-x;
   const leader = Math.abs(dx)>1
     ? `<div class="leader" style="left:0;bottom:0;height:${h-4}px"></div>
        <div class="leader h" style="left:${Math.min(0,dx)}px;width:${Math.abs(dx)}px;bottom:${h-4}px"></div>`
     : `<div class="leader" style="left:0;bottom:0;height:${h}px"></div>`;
-  return `<div class="ev k-${e.kind}" data-id="${e.id}" style="left:${x}px">
+  return `<div class="ev k-${e.kind}${e.ghost?' ghost':''}" data-id="${e.id}" style="left:${x}px">
     ${leader}
     <span class="dot kind-${e.kind}"></span>
     <div class="card ${tier} k-${e.kind}" style="left:${dx}px"><b>${esc(e.label)}${e.n>1?' ×'+e.n:''}</b><small>${fmt(e.t)}</small></div>
@@ -344,7 +497,8 @@ const folded = new Set();
 function render(){
   if(DATA.error){ inner.innerHTML=`<p class="empty">${esc(DATA.error)}</p>`; document.getElementById('bar').innerHTML=''; return; }
   if(!DATA.parents.length){ inner.innerHTML='<p class="empty">Nothing recorded yet.</p>'; bar(); return; }
-  scale();
+  scale(); heatStats();
+  const noun = DATA.src==='swarm' ? 'swarm' : DATA.src==='ledger' ? 'task' : 'session', kid = DATA.src==='swarm' ? 'cards' : 'subagents';
   inner.innerHTML='';
   inner.style.minWidth=(WIDTH+NAMEW)+'px';
   DATA.parents.forEach(p=>{
@@ -355,7 +509,7 @@ function render(){
     const subs=p.subs.map(s=>{
       const s0=s.events[0].t, s1=s.events[s.events.length-1].t;
       return `<div class="row sub" data-sub="${esc(s.id)}">
-        <div class="name"><div><b>${esc(s.name)}</b><span><i class="st ${s.status}"></i>subagent · ${stat(s.status)} · ${s.events.length} events · ${tok(s.tokens)}</span>
+        <div class="name"><div><b>${esc(s.name)}</b><span><i class="st ${s.status}"></i>${esc(s.role||'subagent')} · ${stat(s.status)} · ${s.events.length} events · ${tok(s.tokens)}</span>
           <span class="meta">${fmt(s0)} → ${s.status==='in_progress'?'now':fmt(s1)} · ${dur(ms(s1)-ms(s0))}</span></div>${termBtn(s.id,s.status)}</div>
         ${railHTML(s.events,true,s.status)}
       </div>`; }).join('');
@@ -364,7 +518,7 @@ function render(){
         <div class="name">
           <button class="toggle" title="fold children">▾</button>
           <div>
-            <div class="parent-lab">session · ${p.subs.length} subagents · ${p.events.length} events</div>
+            <div class="parent-lab">${noun} · ${multi()&&p.machine?`<span class="chip">${esc(p.machine)}</span> · `:''}${p.subs.length} ${kid} · ${p.events.length} events</div>
             <b${!FOCUS?` class="open" onclick="focusOn('${esc(p.id)}')"`:''}>${esc(p.name)}</b>
             <span><i class="st ${p.status}"></i>${esc(p.agent)} · ${stat(p.status)} · ${tok(p.tokens)}</span>
             <span class="meta">${fmt(p0)} → ${p.status==='in_progress'?'now':fmt(pEnd)} · ${dur(pEnd-ms(p0))}</span>
@@ -407,7 +561,7 @@ function render(){
 
   guide=document.createElement('div'); guide.className='guide'; guide.innerHTML='<em></em>'; inner.appendChild(guide);
   drawLinks();
-  bar();
+  decorate();
   const want=location.hash.slice(1);
   if(!(want && select(want))){
     // Nothing pinned: follow the newest event.
@@ -458,16 +612,55 @@ window.openTerm=async function(id){
   if(!id){ note.textContent='no session'; note.className='note bad'; return; }
   note.textContent='opening…'; note.className='note';
   try{
-    const r=await fetch('/api/spawn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session:id})});
+    const r=await post('api/spawn',{session:id});
     const text=await r.text();
     let j; try{ j=JSON.parse(text); }catch{
       throw new Error(r.status===501 ? 'restart vibeline web (old process, no /api/spawn)' : `spawn failed (${r.status})`);
     }
     if(!j.ok) throw new Error(j.error||r.statusText);
-    note.textContent=(j.ended?'resumed':'opened')+' · '+(j.terminal||'terminal');
+    note.textContent=(j.ended?'resumed':'opened')+' · '+(j.terminal||'terminal')+(j.machine?' on '+j.machine:'');
     note.className='note ok';
   }catch(e){ note.textContent=String(e.message||e); note.className='note bad'; }
 };
+
+const say=(text,cls='')=>{ const n=document.getElementById('note'); n.textContent=text; n.className='note '+cls; };
+/* two clicks: the first arms the button and says what will be dropped */
+window.rewindTo=async function(sid,eid,retry,btn){
+  if(!btn.classList.contains('armed')){
+    btn.dataset.txt=btn.textContent; btn.classList.add('armed'); btn.textContent=`Click again to drop ${btn.dataset.n} steps`;
+    setTimeout(()=>{ if(btn.isConnected&&btn.classList.contains('armed')){ btn.classList.remove('armed'); btn.textContent=btn.dataset.txt; } },5000);
+    return;
+  }
+  btn.disabled=true; say('rewinding…');
+  try{
+    const j=await (await post('api/rewind',{session:sid,event:eid,retry})).json();
+    if(!j.ok) throw new Error(j.error||'rewind failed');
+    say(j.warning || `rewound ${j.rewound} messages${j.retried?' · prompt resent':''}${j.machine?' on '+j.machine:''}`, j.warning?'bad':'ok');
+    await load();
+  }catch(e){ say(String(e.message||e),'bad'); btn.disabled=false; }
+};
+window.rate=async function(id,rating){
+  const hit=find(id); if(!hit) return;
+  const cur=FB.ratings[id]||{}, box=document.getElementById('fbnote'), note=box?box.value.trim():(cur.note||'');
+  // undefined keeps the rating (Save note); clicking the active thumb clears it
+  const r = rating===undefined ? (cur.rating ?? null) : cur.rating===rating ? null : rating;
+  try{
+    const j=await (await post('api/feedback',{session:hit.p.id,lane:hit.l.id,event:id,rating:r,note,snapshot:hit.e})).json();
+    if(!j.ok) throw new Error(j.error||'not saved');
+    if(r===null && !note) delete FB.ratings[id]; else FB.ratings[id]={rating:r,note};
+    say('feedback saved','ok'); decorate(); paint(hit,true);
+  }catch(e){ say(String(e.message||e),'bad'); }
+};
+window.flagTool=async function(tool,bad,id,note){
+  try{
+    const j=await (await post('api/feedback/tool',{tool,bad,note:note ?? FB.tools[tool] ?? ''})).json();
+    if(!j.ok) throw new Error(j.error||'not saved');
+    if(bad) FB.tools[tool]=note ?? FB.tools[tool] ?? ''; else delete FB.tools[tool];
+    say(bad?`${tool} flagged`:`${tool} unflagged`,'ok'); decorate(); const hit=find(id); if(hit) paint(hit,true);
+  }catch(e){ say(String(e.message||e),'bad'); }
+};
+async function loadFB(){ try{ const j=await (await api('api/feedback')).json(); if(j.ratings){ FB=j; decorate(); } }catch{} }
+function repaint(){ const on=document.querySelector('.ev.on'), hit=on&&find(on.dataset.id); if(hit) paint(hit,true); }
 
 function laneSession(){
   const on=document.querySelector('.ev.on');
@@ -480,25 +673,38 @@ function bar(){
   const t=DATA.totals;
   document.getElementById('bar').innerHTML=`
     <span class="tot"><span class="lab">tokens</span>${t.tokens?`<b>${num(t.tokens)}</b> total · in ${num(t.tokens_in)} · out ${num(t.tokens_out)}`:'<b>—</b> none recorded'}</span>
-    <span><span class="lab">sessions</span><b>${t.tasks}</b></span>
+    <span><span class="lab">${DATA.src==='swarm'?'swarms':DATA.src==='ledger'?'tasks':'sessions'}</span><b>${t.tasks}</b></span>
     <span><span class="lab">events</span><b>${t.events}</b></span>
     <span><span class="lab">running</span><b class="${t.running?'ok':''}">${t.running}</b></span>
+    ${multi()?`<span><span class="lab">machines</span>${DATA.machines.map(m=>`<span class="chip${m.ok?'':' down'}" title="${esc(m.ok?m.sessions+' shown':m.error)}">${esc(m.name)}${m.ok?'':' · down'}</span>`).join(' ')}</span>`:''}
+    ${HEAT.on?`<span><span class="lab">${HEAT.metric==='tool'?'tool time':'model wait'}</span><i class="sw" style="background:var(--cold);margin-left:0"></i>fast<i class="sw" style="background:var(--mid)"></i>typical<i class="sw" style="background:var(--hot)"></i>slow · <b>${document.querySelectorAll('.ev.h-hot').length}</b> slow</span>`:''}
     <span class="db">${esc(DATA.db)}</span>`;
 }
 
 /* ---------- live ---------- */
 const live=document.getElementById('live');
-async function load(){ const f=FOCUS; const d=await (await fetch('api/data?'+SRCQ+(f?'&session='+encodeURIComponent(f):''))).json(); if(f!==FOCUS) return; DATA=d; chrome(); render(); }
+async function load(){ const f=FOCUS; const d=await (await api('api/data?'+SRCQ+(f?'&session='+encodeURIComponent(f):''))).json(); if(f!==FOCUS) return; DATA=d; chrome(); render(); }
 async function tick(){
   try{
-    const v=(await (await fetch('api/version?'+SRCQ)).json()).version;
+    const v=(await (await api('api/version?'+SRCQ)).json()).version;
     live.className='live'; live.lastElementChild.textContent='live';
     if(!DATA || v!==DATA.version) await load();
   }catch(e){ live.className='live off'; live.lastElementChild.textContent='disconnected'; }
 }
 document.getElementById('back').addEventListener('click',()=>focusOn(null));
 document.getElementById('open').addEventListener('click',()=>openTerm(FOCUS || laneSession()));
+const setHeat=o=>{ Object.assign(HEAT,o); store.set('heat',HEAT); decorate(); repaint(); };
+document.getElementById('heat').addEventListener('click',()=>setHeat({on:!HEAT.on}));
+document.getElementById('hmetric').addEventListener('change',e=>setHeat({metric:e.target.value}));
+document.getElementById('hthr').addEventListener('change',e=>setHeat({thr:e.target.value}));
+document.getElementById('honly').addEventListener('change',e=>setHeat({only:e.target.checked}));
+const setFB=on=>{ FBMODE=on; store.set('fbmode',on); decorate(); repaint(); };
+document.getElementById('fb').addEventListener('click',()=>setFB(!FBMODE));
 window.addEventListener('keydown',e=>{
+  if(e.target.closest && e.target.closest('textarea,input,select')) return;
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(e.key==='h') setHeat({on:!HEAT.on});
+  if(e.key==='f' && DATA && DATA.can && DATA.can.feedback) setFB(!FBMODE);
   if(e.key==='Escape'&&FOCUS) focusOn(null);
   if(e.key==='t' && !e.ctrlKey && !e.metaKey && !e.altKey && canOpen()) openTerm(laneSession());
 });
@@ -508,5 +714,5 @@ document.fonts && document.fonts.ready.then(()=>DATA&&drawLinks());
 live.title='Click to follow the newest event';
 live.style.cursor='pointer';
 live.addEventListener('click',()=>{ history.replaceState(null,'',location.pathname+location.search); DATA&&render(); });
-tick(); setInterval(tick,2000);
+decorate(); loadFB(); tick(); setInterval(tick,2000);
 </script></body></html>

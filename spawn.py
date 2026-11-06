@@ -20,10 +20,13 @@ def _ok_id(sid: str) -> bool:
     return bool(sid) and sid.strip() == sid and all(c in _ID_OK for c in sid)
 
 
-def hermes_argv(sid: str) -> list[str]:
+def hermes_argv(sid: str, query: str | None = None) -> list[str]:
+    """`hermes --resume SID`, or with `query` a resumed chat that submits it as the first turn."""
     exe = shutil.which("hermes")
     if not exe:
         raise SpawnError("hermes not on PATH")
+    if query:
+        return [exe, "chat", "--resume", sid, "-q", query]
     return [exe, "--resume", sid]
 
 
@@ -151,7 +154,7 @@ def terminal_argv(inner: list[str], cwd: str | None, title: str) -> list[str]:
     return argv
 
 
-def plan(sid: str, db: Path) -> dict[str, Any]:
+def plan(sid: str, db: Path, query: str | None = None) -> dict[str, Any]:
     if not _ok_id(sid):
         raise SpawnError("bad session id")
     row = sessions.get(db, sid)
@@ -161,7 +164,7 @@ def plan(sid: str, db: Path) -> dict[str, Any]:
     if cwd and not os.path.isdir(cwd):
         cwd = None
     title = f"hermes · {row.get('title') or sid}"
-    inner = hermes_argv(sid)
+    inner = hermes_argv(sid, query)
     argv = terminal_argv(inner, cwd, title)
     return {
         "session": sid,
@@ -180,11 +183,12 @@ def launch(
     *,
     dry: bool = False,
     popen: Callable[..., Any] = subprocess.Popen,
+    query: str | None = None,
 ) -> dict[str, Any]:
     try:
         if not _has_display() and not dry:
             raise SpawnError("no graphical session (DISPLAY/WAYLAND_DISPLAY unset)")
-        spec = plan(sid, db)
+        spec = plan(sid, db, query)
         if dry:
             return {"ok": True, "dry": True, **spec}
         popen(

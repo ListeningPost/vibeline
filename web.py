@@ -1,9 +1,13 @@
 """Local web UI: the rails page, served live from the ledger."""
 from __future__ import annotations
 
+import hmac
 import json
+import os
+import re
+import secrets
+import socket
 import webbrowser
-from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -11,8 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 from .ledger import connect, load_all, verify_chain
 from .rails import _epoch, group
-from . import sessions
-from . import spawn
+from . import feedback, peers, rewind, sessions, spawn, swarm
 
 PAGE = Path(__file__).resolve().parent / "web" / "index.html"
 DEFAULT_PORT = 8877
@@ -184,57 +187,179 @@ def version(db: Path) -> str:
     return f"{n}:{last}"
 
 
-def make_server(db: Path | None, port: int = DEFAULT_PORT, host: str = "127.0.0.1") -> ThreadingHTTPServer:
+def _machine_name() -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]", "-", socket.gethostname() or "local")[:40] or "local"
+
+
+def _is_loopback(host: str) -> bool:
+    return host in ("127.0.0.1", "::1", "localhost") or host.startswith("127.")
+
+
+class Refused(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def make_server(
+    db: Path | None,
+    port: int = DEFAULT_PORT,
+    host: str = "127.0.0.1",
+    *,
+    token: str = "",
+    peer_list: list[peers.Peer] | None = None,
+    name: str | None = None,
+    read_only: bool = False,
+) -> ThreadingHTTPServer:
+    name = name or _machine_name()
+    hub = peers.Hub(peer_list or [], name)
+    store = feedback.store_path()
+
+    def local_data(src: str, only: str | None, full: bool) -> dict[str, Any]:
+        if src == "ledger":
+            if db is None:
+                raise FileNotFoundError("no harness ledger found; pass --db")
+            return web_data(db)
+        if src == "swarm":
+            return swarm.swarm_data(only=only)
+        return sessions.sessions_data(sessions.state_db(), only=only, full=full)
+
+    def local_version(src: str) -> str:
+        if src == "ledger":
+            if db is None:
+                raise FileNotFoundError("no harness ledger found; pass --db")
+            return version(db)
+        return swarm.version() if src == "swarm" else sessions.version(sessions.state_db())
+
+    def data(src: str, only: str | None, local: bool, full: bool) -> dict[str, Any]:
+        if only and peers.SEP in only and not local:
+            out = hub.one(src, only, full)
+            peers._ns(peers.split(only)[0], out)
+        else:
+            out = local_data(src, only, full)
+            for p in out["parents"]:
+                p["machine"] = name
+            if hub.peers and not local and not only and src != "ledger":
+                out = hub.merge(src, out, sessions.MAX_SESSIONS)
+        out["machine"] = name
+        out["can"] = {"open": src == "sessions" and not read_only, "rewind": src == "sessions" and not read_only, "feedback": src == "sessions"}
+        return out
+
+    def export(rated_only: bool) -> list[dict[str, Any]]:
+        def fetch(machine: str, session: str) -> dict[str, Any] | None:
+            if machine:
+                return hub.one("sessions", f"{machine}{peers.SEP}{session}", full=True)
+            return sessions.sessions_data(sessions.state_db(), only=session, full=True)
+
+        return feedback.export_rows(store, fetch, local_name=name, rated_only=rated_only)
+
     class Handler(BaseHTTPRequestHandler):
-        def _send(self, body: bytes, ctype: str, status: int = 200) -> None:
+        def _send(self, body: bytes, ctype: str, status: int = 200, headers: dict[str, str] | None = None) -> None:
             self.send_response(status)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            for k, v in (headers or {}).items():
+                self.send_header(k, v)
             self.end_headers()
             self.wfile.write(body)
 
-        def _source(self) -> tuple[Any, Any, Path]:
-            q = parse_qs(urlparse(self.path).query)
-            if q.get("src") == ["ledger"]:
-                if db is None:
-                    raise FileNotFoundError("no harness ledger found; pass --db")
-                return web_data, version, db
-            only = (q.get("session") or [None])[0]
-            return partial(sessions.sessions_data, only=only), sessions.version, sessions.state_db()
+        def _json(self, obj: Any, status: int = 200) -> None:
+            self._send(json.dumps(obj).encode(), "application/json", status)
+
+        def _query(self) -> dict[str, str]:
+            return {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+
+        def _check_token(self) -> None:
+            """Loopback callers are trusted as before; anyone else must present the token."""
+            if not token or _is_loopback(self.client_address[0]):
+                return
+            auth = self.headers.get("Authorization") or ""
+            given = auth[7:] if auth.startswith("Bearer ") else self._query().get("token", "")
+            if not hmac.compare_digest(given.encode(), token.encode()):
+                raise Refused(401, "token required: open the URL that `hermes vibeline web` printed")
+
+        def _body(self) -> dict[str, Any]:
+            # A JSON content type forces a CORS preflight, which this server never answers: other sites cannot post here.
+            if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+                raise Refused(415, "send application/json")
+            origin = self.headers.get("Origin")
+            if origin and urlparse(origin).netloc != (self.headers.get("Host") or ""):
+                raise Refused(403, "cross-origin request refused")
+            n = int(self.headers.get("Content-Length") or 0)
+            if n > 262144:
+                raise Refused(413, "body too large")
+            body = json.loads(self.rfile.read(n) or b"{}") if n else {}
+            if not isinstance(body, dict):
+                raise Refused(400, "expected a JSON object")
+            return body
 
         def do_POST(self) -> None:
             path = self.path.split("?")[0].split("#")[0]
             try:
-                if path != "/api/spawn":
-                    self._send(b"not found", "text/plain", 404)
-                    return
-                n = int(self.headers.get("Content-Length") or 0)
-                if n > 4096:
-                    self._send(json.dumps({"ok": False, "error": "body too large"}).encode(), "application/json", 413)
-                    return
-                body = json.loads(self.rfile.read(n) or b"{}") if n else {}
-                sid = str((body or {}).get("session") or "").strip()
-                out = spawn.launch(sid, sessions.state_db())
-                self._send(json.dumps(out).encode(), "application/json", 200 if out.get("ok") else 400)
+                self._check_token()
+                if path not in ("/api/spawn", "/api/rewind", "/api/feedback", "/api/feedback/tool"):
+                    raise Refused(404, "not found")
+                body = self._body()
+                sid = str(body.get("session") or "").strip()
+                machine, raw = peers.split(sid)
+                if path == "/api/feedback/tool":
+                    out = feedback.flag_tool(store, str(body.get("tool") or ""), bool(body.get("bad")), str(body.get("note") or ""))
+                elif path == "/api/feedback":
+                    rating = body.get("rating")
+                    out = feedback.rate(
+                        store, machine=machine, session=raw, event=peers.split(str(body.get("event") or ""))[1],
+                        lane=peers.split(str(body.get("lane") or ""))[1], rating=None if rating is None else int(rating),
+                        note=str(body.get("note") or ""), snapshot=body.get("snapshot") if isinstance(body.get("snapshot"), dict) else None,
+                    )
+                elif read_only:
+                    raise Refused(403, "this vibeline is read-only (--read-only)")
+                elif machine:  # the session lives on another machine: act there
+                    fwd = {k: body[k] for k in ("retry", "terminal") if k in body}
+                    if body.get("event"):
+                        fwd["event"] = peers.split(str(body["event"]))[1]
+                    out = hub.forward(sid, path, fwd)
+                elif path == "/api/rewind":
+                    out = rewind.rewind(raw, str(body.get("event") or ""), sessions.state_db(), retry=body.get("retry", True) is not False,
+                                        open_terminal=body.get("terminal", True) is not False)
+                else:
+                    out = spawn.launch(raw, sessions.state_db())
+                self._json(out, 200 if out.get("ok") else 400)
+            except Refused as e:
+                self._json({"ok": False, "error": str(e)}, e.status)
+            except ValueError as e:
+                self._json({"ok": False, "error": str(e)}, 400)
             except Exception as e:
-                self._send(json.dumps({"ok": False, "error": str(e)}).encode(), "application/json", 500)
+                self._json({"ok": False, "error": str(e)}, 500)
 
         def do_GET(self) -> None:
             path = self.path.split("?")[0].split("#")[0]
             try:
+                self._check_token()
+                q = self._query()
+                src = q.get("src") if q.get("src") in ("ledger", "swarm") else "sessions"
+                local = q.get("local") == "1"
                 if path in ("/", "/index.html"):
                     self._send(PAGE.read_bytes(), "text/html; charset=utf-8")
                 elif path == "/api/data":
-                    data, _, src = self._source()
-                    self._send(json.dumps(data(src)).encode(), "application/json")
+                    self._json(data(src, q.get("session") or None, local, q.get("full") == "1"))
                 elif path == "/api/version":
-                    _, ver, src = self._source()
-                    self._send(json.dumps({"version": ver(src)}).encode(), "application/json")
+                    v = local_version(src)
+                    self._json({"version": hub.version(src, v) if hub.peers and not local and src != "ledger" else v})
+                elif path == "/api/feedback":
+                    self._json(feedback.summary(store, key=lambda m, raw: f"{m}{peers.SEP}{raw}" if m else raw))
+                elif path in ("/api/feedback.csv", "/api/feedback.jsonl"):
+                    rows = export(q.get("rated") == "1")
+                    kind = path.rsplit(".", 1)[1]
+                    text = feedback.to_csv(rows) if kind == "csv" else feedback.to_jsonl(rows)
+                    self._send(text.encode(), "text/csv; charset=utf-8" if kind == "csv" else "application/x-ndjson",
+                               headers={"Content-Disposition": f'attachment; filename="vibeline-feedback.{kind}"'})
                 else:
                     self._send(b"not found", "text/plain", 404)
+            except Refused as e:
+                self._send(str(e).encode(), "text/plain", e.status)
             except Exception as e:
-                self._send(json.dumps({"error": str(e)}).encode(), "application/json", 500)
+                self._json({"error": str(e)}, 500)
 
         def log_message(self, *args: Any) -> None:
             pass
@@ -242,13 +367,37 @@ def make_server(db: Path | None, port: int = DEFAULT_PORT, host: str = "127.0.0.
     return ThreadingHTTPServer((host, port), Handler)
 
 
-def serve(db: Path | None, *, port: int = DEFAULT_PORT, host: str = "127.0.0.1", open_browser: bool = False) -> None:
+def serve(
+    db: Path | None,
+    *,
+    port: int = DEFAULT_PORT,
+    host: str = "127.0.0.1",
+    open_browser: bool = False,
+    token: str = "",
+    peer_specs: list[str] | None = None,
+    name: str | None = None,
+    read_only: bool = False,
+) -> None:
+    token = token or os.environ.get("VIBELINE_TOKEN", "").strip()
+    specs = list(peer_specs or []) + os.environ.get("VIBELINE_PEERS", "").replace(",", " ").split()
+    if not _is_loopback(host) and not token:
+        token = secrets.token_urlsafe(18)  # never listen on the network unauthenticated
     try:
-        httpd = make_server(db, port, host)
+        httpd = make_server(db, port, host, token=token, peer_list=[peers.parse(s) for s in specs], name=name, read_only=read_only)
+    except ValueError as e:
+        raise SystemExit(f"vibeline: {e}")
     except OSError as e:
         raise SystemExit(f"vibeline: cannot listen on {host}:{port} ({e.strerror}). Try --port.")
     url = f"http://{host}:{port}/"
     print(f"vibeline: {url}  sessions {sessions.state_db()}  ledger {db or 'none'}  (ctrl-c to stop)", flush=True)
+    if not _is_loopback(host):
+        shown = socket.gethostname() if host in ("0.0.0.0", "::") else host
+        mode = "read-only" if read_only else "can open terminals and rewind sessions on this machine"
+        print(f"vibeline: network access ({mode}). From another machine:\n"
+              f"  browser   http://{shown}:{port}/?token={token}\n"
+              f"  as a peer hermes vibeline web --peer {name or _machine_name()}=http://{shown}:{port}/?token={token}", flush=True)
+    for s in specs:
+        print(f"vibeline: peer {peers.parse(s).name} at {peers.parse(s).url}", flush=True)
     if open_browser:
         webbrowser.open(url)
     try:

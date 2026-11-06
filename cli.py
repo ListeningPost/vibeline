@@ -26,7 +26,7 @@ def run(args) -> None:
     try:
         db = resolve_db(getattr(args, "db", None) or None)
     except FileNotFoundError:
-        if cmd not in ("web", "open"):
+        if cmd not in ("web", "open", "rewind", "feedback"):
             raise
         db = None  # live sessions still work without a harness ledger
     if cmd == "open":
@@ -50,7 +50,33 @@ def run(args) -> None:
     if cmd == "web":
         from .web import serve
 
-        serve(db, port=args.port, host=args.host, open_browser=args.open)
+        serve(db, port=args.port, host=args.host, open_browser=args.open, token=args.token,
+              peer_specs=args.peer, name=args.name or None, read_only=args.read_only)
+        return
+    if cmd == "rewind":
+        from .rewind import rewind
+
+        out = rewind(args.session_id, args.event, hermes_sessions.state_db(), retry=not args.no_retry, dry=args.dry)
+        if not out.get("ok"):
+            raise SystemExit(f"vibeline: {out.get('error') or 'rewind failed'}")
+        if out.get("dry"):
+            print(f"vibeline: dry-run, would drop {out['drops']} messages from {out['session']} starting at message {out['message']}")
+        else:
+            print(f"vibeline: rewound {out['rewound']} messages" + (", prompt resubmitted" if out.get("retried") else "")
+                  + (f"  ({out['warning']})" if out.get("warning") else ""))
+        return
+    if cmd == "feedback":
+        from . import feedback
+
+        fetch = lambda machine, session: None if machine else hermes_sessions.sessions_data(hermes_sessions.state_db(), only=session, full=True)
+        rows = feedback.export_rows(feedback.store_path(), fetch, rated_only=args.rated_only)
+        text = feedback.to_jsonl(rows) if args.format == "jsonl" else feedback.to_csv(rows)
+        if args.out:
+            with open(args.out, "w", encoding="utf-8", newline="") as f:
+                f.write(text)
+            print(f"vibeline: wrote {len(rows)} rows to {args.out}")
+        else:
+            print(text, end="")
         return
     task_id = getattr(args, "task_id", None) or None
     install_widget(str(db), task_id, auto_open=True)
@@ -73,6 +99,19 @@ def setup_argparse(subparser) -> None:
     web.add_argument("--port", type=int, default=8877)
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--open", action="store_true", help="Open the page in a browser")
+    web.add_argument("--token", default="", help="Shared secret for non-loopback clients (generated when --host is not loopback)")
+    web.add_argument("--peer", action="append", default=[], metavar="NAME=URL", help="Also show another machine's vibeline (repeatable)")
+    web.add_argument("--name", default="", help="This machine's label (default: hostname)")
+    web.add_argument("--read-only", action="store_true", help="Refuse open/resume/rewind requests")
+    rw = subs.add_parser("rewind", help="Rewind a session to one of its prompts and reopen it")
+    rw.add_argument("session_id")
+    rw.add_argument("event", help="Prompt event id from the web UI, e.g. m1234")
+    rw.add_argument("--dry", action="store_true", help="Report what would be dropped; change nothing")
+    rw.add_argument("--no-retry", action="store_true", help="Open the session without resubmitting the prompt")
+    fb = subs.add_parser("feedback", help="Export feedback-mode ratings joined to session activity")
+    fb.add_argument("--format", choices=("csv", "jsonl"), default="csv")
+    fb.add_argument("--out", default="", help="Write to a file instead of stdout")
+    fb.add_argument("--rated-only", action="store_true", help="Only rated events, not the whole session")
     op = subs.add_parser("open", help="Spawn a terminal resumed on a Hermes session")
     op.add_argument("session_id")
     op.add_argument("--dry", action="store_true", help="Print the command without spawning")
