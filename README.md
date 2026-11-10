@@ -119,7 +119,8 @@ vibeline-<session>`; run it there over SSH. `VIBELINE_TERMINAL=tmux` forces this
 stored on the machine you look at, tagged with the source machine.
 
 - Anything other than loopback requires the token (`--token`, `VIBELINE_TOKEN`, or generated). Loopback clients
-  are trusted as before.
+  are trusted as before. To keep one token across runs, set the plugin's `token` secret in Hermes (stored as
+  `VIBELINE_TOKEN` in the profile's `.env`) or export the variable.
 - Whoever holds a machine's token can read its sessions and open or rewind them. Add `--read-only` on a
   machine to refuse those actions and only publish its rails.
 - Traffic is plain HTTP. Use it on a network you trust, a VPN/tailnet, or an SSH tunnel.
@@ -211,7 +212,9 @@ python3 /path/to/vibeline web --open
 - **Network:** none by default. With `--host` set to a non-loopback address the server accepts token-bearing
   clients; with `--peer` it makes HTTP requests to the vibeline servers you name. No third-party resources.
 - **Credentials and telemetry:** no telemetry. The only secret is the vibeline token you pass or it generates;
-  it is kept in memory and printed once at startup.
+  it is kept in memory and printed once at startup. `VIBELINE_TOKEN` is declared as a secret setting (`token`)
+  and read through Hermes's `get_secret`, as is `VIBELINE_PEERS` (peer URLs carry tokens). vibeline reads no
+  `.env` or credential file itself.
 - **Environment variables read:** `HERMES_HOME`, `HERMES_KANBAN_DB`, `VIBELINE_DB`, `TRACE_DB`,
   `VIBELINE_TERMINAL`, `VIBELINE_FEEDBACK_DB`, `VIBELINE_PEERS`, `VIBELINE_TOKEN` (a secret), `DISPLAY`,
   `WAYLAND_DISPLAY`.

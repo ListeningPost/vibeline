@@ -368,6 +368,16 @@ def make_server(
     return ThreadingHTTPServer((host, port), Handler)
 
 
+def _secret(name: str) -> str:
+    """A credential by env name. Under Hermes it comes through `agent.secret_scope.get_secret`, which honours
+    the active profile; run standalone (`python3 . web`) there is no Hermes, so it is the process environment."""
+    try:
+        from agent.secret_scope import get_secret
+    except ImportError:
+        return os.environ.get(name, "").strip()
+    return (get_secret(name) or "").strip()
+
+
 def serve(
     db: Path | None,
     *,
@@ -379,8 +389,8 @@ def serve(
     name: str | None = None,
     read_only: bool = False,
 ) -> None:
-    token = token or os.environ.get("VIBELINE_TOKEN", "").strip()
-    specs = list(peer_specs or []) + os.environ.get("VIBELINE_PEERS", "").replace(",", " ").split()
+    token = token or _secret("VIBELINE_TOKEN")
+    specs = list(peer_specs or []) + _secret("VIBELINE_PEERS").replace(",", " ").split()  # peer URLs carry tokens
     if not _is_loopback(host) and not token:
         token = secrets.token_urlsafe(18)  # never listen on the network unauthenticated
     try:

@@ -445,3 +445,24 @@ def test_shell_steps_are_named_after_the_command():
     assert git["label"] == "shell: git" and git["cmd"] == "git" and git["cmds"] == ["git status", "make", "ls"]
     assert git["title"] == "shell: git status, make, shell: ls (2 calls)" and git["tools"] == ["terminal"]
     assert broken["label"] == "TERMINAL" and broken["cmd"] is None  # unreadable arguments keep the tool name
+
+
+def test_secret_comes_from_hermes_scope_when_present(monkeypatch):
+    """Under Hermes the token is resolved by get_secret (profile-scoped), not a bare environment read."""
+    import sys
+    import types
+
+    _load()
+    from vibeline import web
+
+    monkeypatch.setenv("VIBELINE_TOKEN", " from-env ")
+    monkeypatch.setitem(sys.modules, "agent", None)  # standalone: no Hermes importable
+    assert web._secret("VIBELINE_TOKEN") == "from-env"
+    scope = types.ModuleType("agent.secret_scope")
+    scope.get_secret = lambda name, default=None: {"VIBELINE_TOKEN": "from-scope"}.get(name, default)
+    pkg = types.ModuleType("agent")
+    pkg.secret_scope = scope
+    monkeypatch.setitem(sys.modules, "agent", pkg)
+    monkeypatch.setitem(sys.modules, "agent.secret_scope", scope)
+    assert web._secret("VIBELINE_TOKEN") == "from-scope"
+    assert web._secret("VIBELINE_PEERS") == ""

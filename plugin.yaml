@@ -19,3 +19,7 @@ config_schema:
     type: bool
     default: false
     description: "Include token counts in markdown (off by default)."
+  token:
+    type: secret
+    env: VIBELINE_TOKEN
+    description: "Optional shared secret for `hermes vibeline web --host` on a non-loopback address. Empty = generated per run."
