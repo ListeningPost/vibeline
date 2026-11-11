@@ -5,7 +5,6 @@ Read-only. Every Hermes process on the machine writes the same state.db, so this
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import time
 from datetime import datetime, timezone
@@ -13,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from . import shell
+from .paths import hermes_home
 
 MAX_SESSIONS = 8
 LIVE_WINDOW_S = 15 * 60  # an unclosed session with no message for this long is idle, not running
@@ -20,8 +20,7 @@ _TEXT_CAP = 4000
 
 
 def state_db() -> Path:
-    home = os.environ.get("HERMES_HOME", "").strip()
-    return (Path(home) if home else Path.home() / ".hermes") / "state.db"
+    return hermes_home() / "state.db"
 
 
 def _connect(db: Path) -> sqlite3.Connection:

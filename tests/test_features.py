@@ -329,6 +329,44 @@ def test_token_guards_network_clients_and_posts_need_json():
         assert _http(url + "/api/nope", {})[0] == 404
 
 
+def test_loopback_trust_needs_a_loopback_host():
+    """DNS rebinding: the peer is 127.0.0.1 but the browser names the attacker's domain as Host."""
+    _load()
+    with _env(_db()), _serve() as url:  # the default: loopback bind, no token
+        port = url.rsplit(":", 1)[1]
+        for good in (f"127.0.0.1:{port}", f"localhost:{port}", f"LOCALHOST:{port}", f"[::1]:{port}"):
+            assert _http(url + "/api/version", headers={"Host": good})[0] == 200
+        for bad in (f"evil.example:{port}", "evil.example", "127.0.0.1", f"127.0.0.1:{int(port) + 1}", f"127.0.0.1.evil.example:{port}"):
+            assert _http(url + "/api/data?full=1", headers={"Host": bad}, raw=True)[0] == 403
+            assert _http(url + "/", headers={"Host": bad}, raw=True)[0] == 403
+        rebound = {"Host": f"evil.example:{port}", "Origin": f"http://evil.example:{port}"}  # same-origin to the browser
+        assert _http(url + "/api/rewind", {"session": "s1", "event": "x"}, headers=rebound)[0] == 403
+        assert _http(url + "/api/spawn", {"session": "s1"}, headers=rebound)[0] == 403
+    with _env(_db()), _serve(token="sekrit") as url:  # with a token, a foreign Host is just another network client
+        bad = {"Host": "evil.example:%s" % url.rsplit(":", 1)[1]}
+        assert _http(url + "/api/version", headers=bad, raw=True)[0] == 401
+        assert _http(url + "/api/version", headers={**bad, "Authorization": "Bearer sekrit"})[0] == 200
+
+
+def test_hermes_home_follows_the_active_profile(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    _load()
+    from vibeline import feedback, paths, sessions, widget
+
+    monkeypatch.delenv("VIBELINE_FEEDBACK_DB", raising=False)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "env"))
+    monkeypatch.setitem(sys.modules, "hermes_constants", None)  # standalone: no Hermes importable
+    assert paths.hermes_home() == tmp_path / "env"
+    consts = types.ModuleType("hermes_constants")
+    consts.get_hermes_home = lambda: tmp_path / "profile"
+    monkeypatch.setitem(sys.modules, "hermes_constants", consts)
+    assert sessions.state_db() == tmp_path / "profile" / "state.db"
+    assert feedback.store_path() == tmp_path / "profile" / "vibeline" / "feedback.db"
+    assert widget.widgets_dir() == tmp_path / "profile" / "tui-widgets"
+
+
 def test_read_only_refuses_actions_but_keeps_feedback():
     _load()
     with _env(_db()), _serve(read_only=True) as url:

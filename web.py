@@ -271,10 +271,23 @@ def make_server(
         def _query(self) -> dict[str, str]:
             return {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
 
+        def _local(self) -> bool:
+            """A loopback peer that also names this server by a loopback Host. The address alone is not enough:
+            a page whose domain re-resolves to 127.0.0.1 (DNS rebinding) connects from loopback too, but the
+            browser still sends that domain as Host."""
+            if not _is_loopback(self.client_address[0]):
+                return False
+            port = self.server.server_address[1]
+            host = (self.headers.get("Host") or "").strip().lower()
+            names = ("127.0.0.1", "localhost", "[::1]")
+            return host in {f"{n}:{port}" for n in names} or (port == 80 and host in names)
+
         def _check_token(self) -> None:
-            """Loopback callers are trusted as before; anyone else must present the token."""
-            if not token or _is_loopback(self.client_address[0]):
+            """Loopback callers addressing a loopback Host are trusted; anyone else must present the token."""
+            if self._local():
                 return
+            if not token:
+                raise Refused(403, "unrecognised Host: open the URL that `hermes vibeline web` printed")
             auth = self.headers.get("Authorization") or ""
             given = auth[7:] if auth.startswith("Bearer ") else self._query().get("token", "")
             if not hmac.compare_digest(given.encode(), token.encode()):

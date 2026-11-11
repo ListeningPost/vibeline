@@ -1,13 +1,13 @@
 """`hermes vibeline check` — verify a fresh install end to end. Exit 1 on any hard failure."""
 from __future__ import annotations
 
-import os
 import shutil
 import sys
 from pathlib import Path
 
 from . import sessions
 from .ledger import EXAMPLE_DB, list_tasks, resolve_db
+from .paths import hermes_home
 from .widget import TEMPLATE, widgets_dir
 
 
@@ -33,7 +33,7 @@ def run_check(db_arg: str | None = None) -> int:
     hermes = shutil.which("hermes")
     _row(bool(hermes) or None, "hermes on PATH", hermes or "not found (standalone mode still works: python3 <dir> ...)")
 
-    home = Path(os.environ.get("HERMES_HOME", "").strip() or Path.home() / ".hermes")
+    home = hermes_home()
     plugin_link = home / "plugins" / "vibeline"
     here = Path(__file__).resolve().parent
     if plugin_link.exists():

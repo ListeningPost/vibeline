@@ -12,6 +12,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from .paths import hermes_home
 from .sessions import _clip, _event, _first_line
 
 BLACKBOARD = "[swarm:blackboard] "
@@ -26,8 +27,7 @@ def kanban_dbs() -> list[Path]:
     pin = os.environ.get("HERMES_KANBAN_DB", "").strip()
     if pin:
         return [Path(pin).expanduser()]
-    home = os.environ.get("HERMES_HOME", "").strip()
-    root = Path(home) if home else Path.home() / ".hermes"
+    root = hermes_home()
     return [p for p in [root / "kanban.db", *sorted((root / "kanban" / "boards").glob("*/kanban.db"))] if p.is_file()]
 
 

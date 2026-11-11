@@ -118,8 +118,10 @@ in a detached tmux session instead and the page shows the command to attach, e.g
 vibeline-<session>`; run it there over SSH. `VIBELINE_TERMINAL=tmux` forces this on a desktop too. Feedback is
 stored on the machine you look at, tagged with the source machine.
 
-- Anything other than loopback requires the token (`--token`, `VIBELINE_TOKEN`, or generated). Loopback clients
-  are trusted as before. To keep one token across runs, set the plugin's `token` secret in Hermes (stored as
+- Anything other than loopback requires the token (`--token`, `VIBELINE_TOKEN`, or generated). A client is
+  loopback only if it connects from a loopback address *and* its `Host` header is `127.0.0.1:<port>`,
+  `localhost:<port>` or `[::1]:<port>`, so a web page that rebinds its domain to 127.0.0.1 is not trusted; behind
+  a local reverse proxy or a tunnel on a different port, use the token. To keep one token across runs, set the plugin's `token` secret in Hermes (stored as
   `VIBELINE_TOKEN` in the profile's `.env`) or export the variable.
 - Whoever holds a machine's token can read its sessions and open or rewind them. Add `--read-only` on a
   machine to refuse those actions and only publish its rails.

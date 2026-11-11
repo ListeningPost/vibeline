@@ -14,6 +14,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+from .paths import hermes_home
+
 RATINGS = {1: "up", 0: "neutral", -1: "down"}
 COLUMNS = [
     "machine", "session_id", "session_title", "agent", "lane_id", "lane_name", "event_id", "time", "kind", "label",
@@ -26,8 +28,7 @@ def store_path() -> Path:
     explicit = os.environ.get("VIBELINE_FEEDBACK_DB", "").strip()
     if explicit:
         return Path(explicit).expanduser()
-    home = os.environ.get("HERMES_HOME", "").strip()
-    return (Path(home) if home else Path.home() / ".hermes") / "vibeline" / "feedback.db"
+    return hermes_home() / "vibeline" / "feedback.db"
 
 
 def _connect(path: Path) -> sqlite3.Connection:

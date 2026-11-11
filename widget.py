@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from .ledger import load_events, resolve_db
+from .paths import hermes_home
 from .rails import widget_data
 
 TEMPLATE = Path(__file__).resolve().parent / "tui" / "rails.mjs"
@@ -13,9 +13,7 @@ WIDGET_NAME = "rails.mjs"
 
 
 def widgets_dir() -> Path:
-    home = os.environ.get("HERMES_HOME", "").strip()
-    root = Path(home) if home else Path.home() / ".hermes"
-    return root / "tui-widgets"
+    return hermes_home() / "tui-widgets"
 
 
 def widget_path() -> Path:
